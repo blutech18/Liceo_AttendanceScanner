@@ -201,19 +201,20 @@
 		visibility: visible;
 	}
 
-	/* Mobile-first: fill the entire screen so the camera has maximum space */
 	.modal {
 		position: fixed;
-		inset: 0;
-		max-width: none;
-		width: 100%;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%) scale(0.96);
+		max-width: 400px;
+		width: calc(100% - 32px);
 		background: #800000;
-		border-radius: 0;
+		border-radius: 20px;
 		z-index: 201;
 		overflow: hidden;
 		opacity: 0;
 		visibility: hidden;
-		transform: scale(0.96);
+		max-height: 90dvh;
 		transition:
 			opacity 0.25s ease,
 			visibility 0.25s ease,
@@ -225,24 +226,7 @@
 	.modal.visible {
 		opacity: 1;
 		visibility: visible;
-		transform: scale(1);
-	}
-
-	/* On larger screens restore the centred card style */
-	@media (min-width: 480px) {
-		.modal {
-			inset: auto;
-			top: 50%;
-			left: 50%;
-			transform: translate(-50%, -50%) scale(0.92);
-			max-width: 400px;
-			width: calc(100% - 32px);
-			border-radius: 20px;
-			max-height: 90dvh;
-		}
-		.modal.visible {
-			transform: translate(-50%, -50%) scale(1);
-		}
+		transform: translate(-50%, -50%) scale(1);
 	}
 
 	.modal-header {
@@ -279,28 +263,16 @@
 
 	.camera-area {
 		position: relative;
-		/* Fill all available vertical space — the camera is the priority */
-		flex: 1;
-		min-height: 0;
-		width: 100%;
+		width: calc(100% - 32px);
+		aspect-ratio: 1;
+		margin: 0 auto;
+		border-radius: 12px;
 		background: #000;
-		margin: 0;
-		border-radius: 0;
 		overflow: hidden;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-	}
-
-	@media (min-width: 480px) {
-		.camera-area {
-			width: calc(100% - 32px);
-			aspect-ratio: 1;
-			flex: none;
-			margin: 0 auto;
-			border-radius: 12px;
-			max-height: none;
-		}
+		flex-shrink: 0;
 	}
 
 	/* Force the html5-qrcode container to fill the camera area */
