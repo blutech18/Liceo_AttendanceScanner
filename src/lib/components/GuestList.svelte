@@ -5,6 +5,7 @@
 	interface Guest {
 		name: string;
 		email: string;
+		type: string;
 		scanTime: string | null;
 		attended: boolean;
 	}
@@ -13,24 +14,46 @@
 	let loading = $state(true);
 	let refreshing = $state(false);
 	let filter = $state('all');
+	let typeFilter = $state('all');
 	let sort = $state('default');
+	let pageSize = $state(25);
+	let search = $state('');
 	let intervalId: ReturnType<typeof setInterval> | null = null;
 
 	let attendedCount = $derived(guests.filter((g) => g.attended).length);
 	let totalCount = $derived(guests.length);
 
+	// Derive unique participant types from data (only show type filter when >1 type exists)
+	let participantTypes = $derived.by(() => {
+		const types = new Set(guests.map((g) => g.type).filter(Boolean));
+		return Array.from(types).sort();
+	});
+	let hasMultipleTypes = $derived(participantTypes.length > 1);
+
 	// Pagination
-	const PAGE_SIZE = 10;
 	let currentPage = $state(1);
 
 	let filteredGuests = $derived.by(() => {
 		let list = [...guests];
 
-		// Filter
+		// Type filter
+		if (typeFilter !== 'all') {
+			list = list.filter((g) => g.type === typeFilter);
+		}
+
+		// Attendance filter
 		if (filter === 'attended') {
 			list = list.filter((g) => g.attended);
 		} else if (filter === 'notyet') {
 			list = list.filter((g) => !g.attended);
+		}
+
+		// Search filter
+		const q = search.trim().toLowerCase();
+		if (q) {
+			list = list.filter(
+				(g) => g.name.toLowerCase().includes(q) || g.email.toLowerCase().includes(q)
+			);
 		}
 
 		// Sort
@@ -65,15 +88,18 @@
 		return list;
 	});
 
-	let totalPages = $derived(Math.max(1, Math.ceil(filteredGuests.length / PAGE_SIZE)));
+	let totalPages = $derived(Math.max(1, Math.ceil(filteredGuests.length / pageSize)));
 	let pagedGuests = $derived(
-		filteredGuests.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+		filteredGuests.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 	);
 
-	// Reset to page 1 when filter/sort changes
+	// Reset to page 1 when any filter/sort/pageSize/search changes
 	$effect(() => {
 		filter;
+		typeFilter;
 		sort;
+		pageSize;
+		search;
 		currentPage = 1;
 	});
 
@@ -103,6 +129,7 @@
 						return {
 							name: r.name || '',
 							email: r.email || '',
+							type: (r.type || r.participantType || r.category || '').trim(),
 							scanTime: match ? match.scanTime || null : null,
 							attended: !!match
 						};
@@ -111,6 +138,7 @@
 					guests = data.attendees.map((a: any) => ({
 						name: a.name || '',
 						email: a.email || '',
+						type: (a.type || a.participantType || a.category || '').trim(),
 						scanTime: a.scanTime || null,
 						attended: true
 					}));
@@ -190,6 +218,64 @@
 				</div>
 			</div>
 
+			<div class="search-bar">
+				<div class="search-field">
+					<svg
+						class="search-icon"
+						width="15"
+						height="15"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<circle cx="11" cy="11" r="8" />
+						<line x1="21" y1="21" x2="16.65" y2="16.65" />
+					</svg>
+					<input
+						class="search-input"
+						type="search"
+						placeholder="Search name or email…"
+						bind:value={search}
+					/>
+					{#if search}
+						<button class="search-clear" onclick={() => (search = '')} aria-label="Clear search">
+							<svg
+								width="13"
+								height="13"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2.5"
+								stroke-linecap="round"
+							>
+								<line x1="18" y1="6" x2="6" y2="18" />
+								<line x1="6" y1="6" x2="18" y2="18" />
+							</svg>
+						</button>
+					{/if}
+				</div>
+			</div>
+
+			{#if hasMultipleTypes}
+				<div class="type-filter-bar">
+					<button
+						class="type-pill"
+						class:active={typeFilter === 'all'}
+						onclick={() => (typeFilter = 'all')}>All</button
+					>
+					{#each participantTypes as ptype}
+						<button
+							class="type-pill"
+							class:active={typeFilter === ptype}
+							onclick={() => (typeFilter = ptype)}>{ptype}</button
+						>
+					{/each}
+				</div>
+			{/if}
+
 			<div class="panel-body">
 				{#if loading}
 					<div class="loading-state">
@@ -229,7 +315,7 @@
 							<tbody>
 								{#each pagedGuests as guest, i}
 									<tr>
-										<td class="col-num">{(currentPage - 1) * PAGE_SIZE + i + 1}</td>
+										<td class="col-num">{(currentPage - 1) * pageSize + i + 1}</td>
 										<td class="col-name">
 											<div class="guest-name">{guest.name}</div>
 											{#if guest.email}
@@ -257,25 +343,39 @@
 
 			{#if !loading && filteredGuests.length > 0}
 				<div class="pagination">
-					{#if currentPage > 1}
-						<button class="page-btn" onclick={() => goToPage(1)} aria-label="First page">«</button>
-						<button
-							class="page-btn"
-							onclick={() => goToPage(currentPage - 1)}
-							aria-label="Previous page">‹</button
-						>
-					{/if}
-					<span class="page-info">{currentPage} / {totalPages}</span>
-					{#if currentPage < totalPages}
-						<button
-							class="page-btn"
-							onclick={() => goToPage(currentPage + 1)}
-							aria-label="Next page">›</button
-						>
-						<button class="page-btn" onclick={() => goToPage(totalPages)} aria-label="Last page"
-							>»</button
-						>
-					{/if}
+					<div class="pagination-left">
+						<span class="rows-label">Rows</span>
+						<select class="rows-select" bind:value={pageSize}>
+							<option value={25}>25</option>
+							<option value={50}>50</option>
+							<option value={100}>100</option>
+						</select>
+					</div>
+					<div class="pagination-center">
+						{#if currentPage > 1}
+							<button class="page-btn" onclick={() => goToPage(1)} aria-label="First page">«</button
+							>
+							<button
+								class="page-btn"
+								onclick={() => goToPage(currentPage - 1)}
+								aria-label="Previous page">‹</button
+							>
+						{/if}
+						<span class="page-info">{currentPage} / {totalPages}</span>
+						{#if currentPage < totalPages}
+							<button
+								class="page-btn"
+								onclick={() => goToPage(currentPage + 1)}
+								aria-label="Next page">›</button
+							>
+							<button class="page-btn" onclick={() => goToPage(totalPages)} aria-label="Last page"
+								>»</button
+							>
+						{/if}
+					</div>
+					<div class="pagination-right">
+						<span class="rows-label">{filteredGuests.length} total</span>
+					</div>
 				</div>
 			{/if}
 		</div>
@@ -317,10 +417,10 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 12px 14px;
+		padding: 10px 14px;
 		gap: 10px;
 		flex-wrap: wrap;
-		border-bottom: 1.5px solid #800000;
+		flex-shrink: 0;
 	}
 
 	.header-left {
@@ -394,22 +494,190 @@
 		animation: spin 1s linear infinite;
 	}
 
+	.search-bar {
+		padding: 10px 14px;
+		border-bottom: 1.5px solid #800000;
+		background: #fff;
+		flex-shrink: 0;
+	}
+
+	.search-field {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background: rgba(128, 0, 0, 0.04);
+		border: 1.5px solid rgba(128, 0, 0, 0.15);
+		border-radius: 10px;
+		padding: 8px 12px;
+		color: rgba(128, 0, 0, 0.4);
+		transition:
+			border-color 0.2s,
+			background 0.2s,
+			box-shadow 0.2s;
+	}
+
+	.search-field:focus-within {
+		border-color: #800000;
+		background: #fff;
+		box-shadow: 0 0 0 3px rgba(128, 0, 0, 0.08);
+		color: #800000;
+	}
+
+	.search-icon {
+		flex-shrink: 0;
+	}
+
+	.search-input {
+		flex: 1;
+		border: none;
+		outline: none;
+		background: transparent;
+		font-family: 'Inter', sans-serif;
+		font-size: 13px;
+		color: #3a1010;
+		min-width: 0;
+		line-height: 1.2;
+	}
+
+	.search-input::placeholder {
+		color: rgba(128, 0, 0, 0.35);
+	}
+
+	/* hide the native clear button on search inputs */
+	.search-input::-webkit-search-cancel-button {
+		display: none;
+	}
+
+	.search-clear {
+		background: rgba(128, 0, 0, 0.08);
+		border: none;
+		width: 20px;
+		height: 20px;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		border-radius: 50%;
+		color: rgba(128, 0, 0, 0.6);
+		transition: background 0.15s;
+	}
+
+	.search-clear:hover {
+		background: rgba(128, 0, 0, 0.18);
+		color: #800000;
+	}
+
 	.panel-body {
 		flex: 1;
 		overflow-y: auto;
 		overflow-x: auto;
 		min-height: 0;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	.type-filter-bar {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 8px 14px;
+		border-bottom: 1px solid rgba(128, 0, 0, 0.15);
+		background: rgba(128, 0, 0, 0.02);
+		overflow-x: auto;
+		flex-shrink: 0;
+		scrollbar-width: none;
+	}
+
+	.type-filter-bar::-webkit-scrollbar {
+		display: none;
+	}
+
+	.type-pill {
+		white-space: nowrap;
+		padding: 5px 14px;
+		border-radius: 20px;
+		border: 1.5px solid rgba(128, 0, 0, 0.25);
+		background: transparent;
+		color: rgba(128, 0, 0, 0.6);
+		font-family: 'Inter', sans-serif;
+		font-size: 11px;
+		font-weight: 600;
+		cursor: pointer;
+		transition:
+			background 0.15s,
+			color 0.15s,
+			border-color 0.15s;
+	}
+
+	.type-pill:hover {
+		background: rgba(128, 0, 0, 0.07);
+		border-color: rgba(128, 0, 0, 0.4);
+		color: #800000;
+	}
+
+	.type-pill.active {
+		background: #800000;
+		border-color: #800000;
+		color: #fff;
 	}
 
 	.pagination {
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		align-items: center;
+		gap: 6px;
+		padding: 8px 14px;
+		border-top: 1.5px solid #800000;
+		background: #fff;
+		flex-shrink: 0;
+	}
+
+	.pagination-left {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.pagination-center {
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		gap: 6px;
-		padding: 10px 14px;
-		border-top: 1.5px solid #800000;
-		background: #fff;
-		flex-shrink: 0;
+	}
+
+	.pagination-right {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+	}
+
+	.rows-label {
+		font-size: 11px;
+		font-weight: 500;
+		color: rgba(128, 0, 0, 0.5);
+		white-space: nowrap;
+	}
+
+	.rows-select {
+		color: #800000;
+		background: rgba(128, 0, 0, 0.05);
+		border: 1px solid rgba(128, 0, 0, 0.2);
+		border-radius: 6px;
+		padding: 4px 20px 4px 6px;
+		font-family: 'Inter', sans-serif;
+		font-size: 11px;
+		font-weight: 600;
+		cursor: pointer;
+		appearance: none;
+		-webkit-appearance: none;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%23800000'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: right 4px center;
+	}
+
+	.rows-select:focus {
+		outline: 2px solid rgba(128, 0, 0, 0.3);
+		outline-offset: 1px;
 	}
 
 	.page-btn {
