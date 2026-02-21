@@ -30,22 +30,21 @@
 <style>
 	.dock-outer {
 		position: fixed;
-		bottom: 12px;
-		left: 10px;
-		right: 10px;
+		bottom: 0;
+		left: 0;
+		right: 0;
 		z-index: 50;
 		pointer-events: none;
 	}
 
 	.dock-inner {
 		background: #800000;
-		border-radius: 16px;
-		max-width: 1100px;
-		margin: 0 auto;
+		border-radius: 0;
+		max-width: none;
+		margin: 0;
 		padding: 8px 20px;
-		box-shadow:
-			0 8px 32px rgba(128, 0, 0, 0.25),
-			0 2px 8px rgba(0, 0, 0, 0.1);
+		padding-bottom: calc(8px + env(safe-area-inset-bottom));
+		box-shadow: 0 -2px 12px rgba(128, 0, 0, 0.2);
 		display: flex;
 		align-items: center;
 		pointer-events: auto;

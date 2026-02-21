@@ -480,8 +480,9 @@
 		width: 100%;
 		padding: 10px 10px 0;
 		animation: fadeInUp 0.4s ease-out;
-		/* Fill full height below navbar; dock floats over content */
-		height: calc(100dvh - 56px);
+		/* Viewport minus navbar (56px) minus dock height (~60px) */
+		height: calc(100dvh - 56px - 60px);
+		box-sizing: border-box;
 	}
 
 	.main-section {
@@ -498,7 +499,7 @@
 		min-height: 0;
 		background: #ffffff;
 		border: 1.5px solid #800000;
-		border-radius: 0;
+		border-radius: 12px;
 		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 		overflow: hidden;
 	}
@@ -779,8 +780,6 @@
 		border-top: 1.5px solid #800000;
 		background: #fff;
 		flex-shrink: 0;
-		/* Extra bottom clearance so dock doesn't cover last row */
-		margin-bottom: 80px;
 	}
 
 	.pagination-left {
