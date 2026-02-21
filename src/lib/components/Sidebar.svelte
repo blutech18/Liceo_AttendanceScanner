@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
+	import { navState } from '$lib/navState.svelte';
 
 	let { collapsed = $bindable(false) } = $props();
 
@@ -18,22 +20,34 @@
 			}
 		}
 	}
+
+	function handleNavClick() {
+		navState.mobileMenuOpen = false;
+	}
 </script>
 
-<aside class="sidebar" class:collapsed>
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+	class="mobile-overlay"
+	class:visible={navState.mobileMenuOpen}
+	onclick={() => (navState.mobileMenuOpen = false)}
+></div>
+
+<aside class="sidebar" class:collapsed class:mobile-open={navState.mobileMenuOpen}>
 	<div class="sidebar-header">
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="logo-icon" onclick={collapsed ? expand : undefined}>
-			<svg width="22" height="22" viewBox="0 0 24 24" fill="white">
-				<path
-					d="M3 11h2v2H3v-2zm4-4h2v2H7V7zm0 8h2v2H7v-2zm-4 0h2v2H3v-2zm0-8h2v2H3V7zm8-4h2v10h-2V3zm8 0h2v2h-2V3zM7 3h2v2H7V3zM3 3h2v2H3V3zm16 0h2v2h-2V3zm0 8h2v2h-2v-2zm0 8h2v2h-2v-2zm-4-4h2v6h-2v-6zm-4 2h2v4h-2v-4zm-4 0h2v4H7v-4zm12-6h2v2h-2v-2zm-8 0h2v2h-2v-2z"
-				/>
-			</svg>
+		<div
+			class="logo-icon"
+			onclick={collapsed ? expand : undefined}
+			class:cursor-pointer={collapsed}
+		>
+			<img src="/ldcu-logo.png" alt="Liceo Logo" class="logo-img" />
 		</div>
-		{#if !collapsed}
-			<span class="logo-text">EventFlow</span>
-		{/if}
+		<div class="header-text-container" class:collapsed-text={collapsed}>
+			<span class="logo-text">EdTech</span>
+		</div>
 		{#if !collapsed}
 			<button class="toggle-btn" onclick={toggle} aria-label="Collapse sidebar">
 				<svg
@@ -53,164 +67,277 @@
 		{/if}
 	</div>
 
-	<nav class="sidebar-nav">
-		<a href="/" class="nav-link active">
-			<svg
-				width="20"
-				height="20"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-				<polyline points="9 22 9 12 15 12 15 22" />
-			</svg>
-			{#if !collapsed}<span>Dashboard</span>{/if}
+	<nav class="sidebar-nav" class:nav-collapsed={collapsed}>
+		<a href="/" class="nav-link" class:active={$page.url.pathname === '/'} onclick={handleNavClick}>
+			<div class="icon-container">
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2" />
+					<circle cx="9" cy="7" r="4" />
+					<path d="M23 21v-2a4 4 0 00-3-3.87" />
+					<path d="M16 3.13a4 4 0 010 7.75" />
+				</svg>
+			</div>
+			<div class="text-container" class:collapsed-text={collapsed}>
+				<span>Guest List</span>
+			</div>
 		</a>
-		<a href="/" class="nav-link">
-			<svg
-				width="20"
-				height="20"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2" />
-				<circle cx="9" cy="7" r="4" />
-				<path d="M23 21v-2a4 4 0 00-3-3.87" />
-				<path d="M16 3.13a4 4 0 010 7.75" />
-			</svg>
-			{#if !collapsed}<span>Guests</span>{/if}
+		<a
+			href="/scanner"
+			class="nav-link"
+			class:active={$page.url.pathname === '/scanner' || $page.url.pathname.startsWith('/scanner/')}
+			onclick={handleNavClick}
+		>
+			<div class="icon-container">
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M7 3H3v4" />
+					<path d="M17 3h4v4" />
+					<path d="M21 17v4h-4" />
+					<path d="M3 17v4h4" />
+					<rect x="9" y="9" width="6" height="6" rx="1" />
+				</svg>
+			</div>
+			<div class="text-container" class:collapsed-text={collapsed}>
+				<span>Scanner</span>
+			</div>
 		</a>
-		<a href="/" class="nav-link">
-			<svg
-				width="20"
-				height="20"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				<rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-				<line x1="16" y1="2" x2="16" y2="6" />
-				<line x1="8" y1="2" x2="8" y2="6" />
-				<line x1="3" y1="10" x2="21" y2="10" />
-			</svg>
-			{#if !collapsed}<span>Events</span>{/if}
+		<a href="/" class="nav-link" onclick={handleNavClick}>
+			<div class="icon-container">
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+					<line x1="16" y1="2" x2="16" y2="6" />
+					<line x1="8" y1="2" x2="8" y2="6" />
+					<line x1="3" y1="10" x2="21" y2="10" />
+				</svg>
+			</div>
+			<div class="text-container" class:collapsed-text={collapsed}>
+				<span>Events</span>
+			</div>
 		</a>
-		<a href="/" class="nav-link">
-			<svg
-				width="20"
-				height="20"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				<circle cx="12" cy="12" r="3" />
-				<path
-					d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"
-				/>
-			</svg>
-			{#if !collapsed}<span>Settings</span>{/if}
+		<a href="/" class="nav-link" onclick={handleNavClick}>
+			<div class="icon-container">
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<circle cx="12" cy="12" r="3" />
+					<path
+						d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 00.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"
+					/>
+				</svg>
+			</div>
+			<div class="text-container" class:collapsed-text={collapsed}>
+				<span>Settings</span>
+			</div>
 		</a>
 	</nav>
 
-	<div class="sidebar-footer">
-		<a href="/" class="nav-link">
-			<svg
-				width="20"
-				height="20"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-				<polyline points="16 17 21 12 16 7" />
-				<line x1="21" y1="12" x2="9" y2="12" />
-			</svg>
-			{#if !collapsed}<span>Logout</span>{/if}
+	<div class="sidebar-footer" class:footer-collapsed={collapsed}>
+		<a href="/" class="nav-link" onclick={handleNavClick}>
+			<div class="icon-container">
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+					<polyline points="16 17 21 12 16 7" />
+					<line x1="21" y1="12" x2="9" y2="12" />
+				</svg>
+			</div>
+			<div class="text-container" class:collapsed-text={collapsed}>
+				<span>Logout</span>
+			</div>
 		</a>
 	</div>
 </aside>
 
 <style>
+	.mobile-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.5);
+		z-index: 45;
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.3s ease;
+	}
+
+	.mobile-overlay.visible {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
 	.sidebar {
-		display: none;
+		display: flex;
 		position: fixed;
 		left: 0;
 		top: 0;
 		bottom: 0;
 		width: 260px;
-		background: #800000;
+		background: var(--bg-sidebar);
 		flex-direction: column;
-		z-index: 100;
-		transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		z-index: 50;
+		transform: translateX(-100%);
+		transition:
+			transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+			width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 		overflow: hidden;
+		box-shadow: var(--shadow-md);
+		will-change: width, transform;
+	}
+
+	.sidebar.mobile-open {
+		transform: translateX(0);
 	}
 
 	.sidebar.collapsed {
 		width: 72px;
 	}
 
+	@media (max-width: 767px) {
+		.toggle-btn {
+			display: none;
+		}
+
+		.sidebar.collapsed {
+			width: 260px;
+		}
+
+		/* Force text to show on mobile even if .collapsed-text is applied */
+		.sidebar-nav .text-container,
+		.sidebar-nav .text-container.collapsed-text,
+		.sidebar-footer .text-container,
+		.sidebar-footer .text-container.collapsed-text,
+		.header-text-container,
+		.header-text-container.collapsed-text {
+			opacity: 1 !important;
+			pointer-events: auto !important;
+			transform: translateX(0) !important;
+			width: auto !important;
+			display: block !important;
+		}
+
+		.header-text-container.collapsed-text,
+		.header-text-container {
+			margin-left: 12px !important;
+		}
+	}
+
 	@media (min-width: 768px) {
+		.mobile-overlay {
+			display: none;
+		}
+
 		.sidebar {
 			display: flex;
+			position: static;
+			transform: translateX(0);
+			width: 260px; /* Base width */
+			flex-shrink: 0;
+			height: 100%;
+			border-right: 1px solid rgba(0, 0, 0, 0.1);
+		}
+
+		.sidebar.collapsed {
+			width: 72px;
 		}
 	}
 
 	.sidebar-header {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		padding: 20px 16px;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-		min-height: 64px;
-	}
-
-	.collapsed .sidebar-header {
-		justify-content: center;
-		padding: 20px 0;
+		padding: 0 16px;
+		height: var(--navbar-height);
+		border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+		overflow: hidden;
+		white-space: nowrap;
 	}
 
 	.logo-icon {
 		width: 40px;
 		height: 40px;
 		min-width: 40px;
-		background: rgba(255, 255, 255, 0.2);
+		background: transparent;
 		border-radius: 10px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: white;
+		z-index: 2;
+		overflow: hidden;
 	}
 
-	.collapsed .logo-icon {
+	.logo-img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+	}
+
+	.cursor-pointer {
 		cursor: pointer;
+	}
+
+	.header-text-container {
+		flex: 1;
+		margin-left: 12px;
+		opacity: 1;
+		transition:
+			opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+			margin 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+	}
+
+	.header-text-container.collapsed-text {
+		opacity: 0;
+		margin-left: 0;
+		pointer-events: none;
+		transition: opacity 0.1s ease;
 	}
 
 	.logo-text {
 		color: white;
 		font-size: 18px;
 		font-weight: 700;
-		white-space: nowrap;
+		letter-spacing: -0.01em;
 	}
 
 	.toggle-btn {
-		margin-left: auto;
 		background: none;
 		border: none;
 		color: rgba(255, 255, 255, 0.6);
@@ -220,43 +347,72 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		transition:
-			color 0.2s,
-			background 0.2s;
+		transition: all 0.2s ease;
+		margin-left: auto;
 	}
 
 	.toggle-btn:hover {
 		color: white;
-		background: rgba(255, 255, 255, 0.1);
+		background: rgba(255, 255, 255, 0.15);
 	}
 
 	.sidebar-nav {
 		flex: 1;
 		display: flex;
 		flex-direction: column;
-		padding: 12px 8px;
-		gap: 4px;
+		padding: 24px 0; /* Remove horizontal padding here to rely on link padding */
+		gap: 8px;
+		overflow-y: auto;
+		overflow-x: hidden;
+	}
+
+	/* Scrollbar for nav */
+	.sidebar-nav::-webkit-scrollbar {
+		width: 4px;
+	}
+	.sidebar-nav::-webkit-scrollbar-thumb {
+		background: rgba(255, 255, 255, 0.2);
+		border-radius: 2px;
 	}
 
 	.nav-link {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		padding: 12px 16px;
+		padding: 10px; /* Uniform padding ensures icon starts precisely at 10px inside */
+		margin: 0 16px; /* 16px + 10px = 26px left edge of icon */
 		color: rgba(255, 255, 255, 0.7);
 		text-decoration: none;
 		border-radius: 10px;
-		font-size: 14px;
+		font-size: 15px;
 		font-weight: 500;
-		transition:
-			background 0.2s,
-			color 0.2s;
-		white-space: nowrap;
+		transition: all 0.2s ease;
+		overflow: hidden;
 	}
 
-	.collapsed .nav-link {
+	.icon-container {
+		width: 20px;
+		height: 20px;
+		min-width: 20px;
+		display: flex;
+		align-items: center;
 		justify-content: center;
-		padding: 12px;
+		margin-right: 14px;
+	}
+
+	.text-container {
+		white-space: nowrap;
+		opacity: 1;
+		transform: translateX(0);
+		transition:
+			opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+			transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+	}
+
+	.text-container.collapsed-text {
+		opacity: 0;
+		pointer-events: none;
+		transform: translateX(-10px);
+		transition: opacity 0.1s ease;
 	}
 
 	.nav-link:hover {
@@ -270,7 +426,15 @@
 	}
 
 	.sidebar-footer {
-		padding: 12px 8px;
-		border-top: 1px solid rgba(255, 255, 255, 0.1);
+		padding: 0;
+		height: 48px;
+		min-height: 48px;
+		display: flex;
+		align-items: center;
+		border-top: 1px solid rgba(0, 0, 0, 0.1);
+	}
+
+	.sidebar-footer .nav-link {
+		flex: 1;
 	}
 </style>

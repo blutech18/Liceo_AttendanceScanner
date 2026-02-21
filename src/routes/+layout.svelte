@@ -14,12 +14,6 @@
 	if (browser) {
 		sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
 	}
-
-	$effect(() => {
-		if (browser) {
-			document.body.style.setProperty('--sidebar-width', sidebarCollapsed ? '72px' : '260px');
-		}
-	});
 </script>
 
 <svelte:head>
@@ -33,4 +27,20 @@
 </svelte:head>
 
 <Sidebar bind:collapsed={sidebarCollapsed} />
-{@render children()}
+
+<div class="main-wrapper">
+	{@render children()}
+</div>
+
+<style>
+	.main-wrapper {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		height: 100dvh;
+		background: var(--bg-primary);
+		overflow: hidden;
+		position: relative;
+	}
+</style>

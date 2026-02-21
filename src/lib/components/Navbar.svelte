@@ -1,44 +1,59 @@
 <script lang="ts">
-	let {
-		scanCount = 0,
-		sidebarCollapsed = false,
-		onScanClick = () => {}
-	}: { scanCount?: number; sidebarCollapsed?: boolean; onScanClick?: () => void } = $props();
+	let { title = 'Entry Scanner' }: { title?: string } = $props();
+	import { navState } from '$lib/navState.svelte';
 </script>
 
 <header class="navbar">
-	<div
-		class="navbar-inner"
-		class:sidebar-expanded={!sidebarCollapsed}
-		class:sidebar-collapsed={sidebarCollapsed}
-	>
+	<div class="navbar-inner">
 		<div class="nav-left">
-			<div class="nav-logo">
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-					<path
-						d="M3 11h2v2H3v-2zm4-4h2v2H7V7zm0 8h2v2H7v-2zm-4 0h2v2H3v-2zm0-8h2v2H3V7zm8-4h2v10h-2V3zm8 0h2v2h-2V3zM7 3h2v2H7V3zM3 3h2v2H3V3zm16 0h2v2h-2V3zm0 8h2v2h-2v-2zm0 8h2v2h-2v-2zm-4-4h2v6h-2v-6zm-4 2h2v4h-2v-4zm-4 0h2v4H7v-4zm12-6h2v2h-2v-2zm-8 0h2v2h-2v-2z"
-					/>
+			<button
+				class="mobile-menu-btn"
+				onclick={() => (navState.mobileMenuOpen = !navState.mobileMenuOpen)}
+				aria-label="Toggle Menu"
+			>
+				<svg
+					width="24"
+					height="24"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<line x1="3" y1="12" x2="21" y2="12" />
+					<line x1="3" y1="6" x2="21" y2="6" />
+					<line x1="3" y1="18" x2="21" y2="18" />
 				</svg>
+			</button>
+			<div class="nav-logo">
+				<img src="/ldcu-logo.png" alt="Liceo Logo" class="logo-img" />
 			</div>
 		</div>
 
 		<div class="nav-center">
-			<h1 class="nav-title">Event Entry Scanner</h1>
+			<h1 class="nav-title">{title}</h1>
 		</div>
 
 		<div class="nav-right">
-			<div class="scan-badge">
-				<span class="badge-number">{scanCount}</span>
-				<span class="badge-label">scans</span>
-			</div>
-			<button class="scan-btn-desktop" onclick={onScanClick}>
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-					<path
-						d="M3 11h2v2H3v-2zm4-4h2v2H7V7zm0 8h2v2H7v-2zm-4 0h2v2H3v-2zm0-8h2v2H3V7zm8-4h2v10h-2V3zm8 0h2v2h-2V3zM7 3h2v2H7V3zM3 3h2v2H3V3zm16 0h2v2h-2V3zm0 8h2v2h-2v-2zm0 8h2v2h-2v-2zm-4-4h2v6h-2v-6zm-4 2h2v4h-2v-4zm-4 0h2v4H7v-4zm12-6h2v2h-2v-2zm-8 0h2v2h-2v-2z"
-					/>
+			<a href="/scanner" class="mobile-scanner-btn" aria-label="Go to Scanner">
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M7 3H3v4" />
+					<path d="M17 3h4v4" />
+					<path d="M21 17v4h-4" />
+					<path d="M3 17v4h4" />
+					<rect x="9" y="9" width="6" height="6" rx="1" />
 				</svg>
-				Scan QR
-			</button>
+			</a>
 		</div>
 	</div>
 </header>
@@ -47,115 +62,130 @@
 	.navbar {
 		position: sticky;
 		top: 0;
-		z-index: 50;
-		background: #800000;
+		z-index: 40;
+		height: var(--navbar-height);
+		background: var(--bg-sidebar);
+		border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+		display: flex;
+		align-items: center;
+		box-shadow: var(--shadow-sm);
 	}
 
 	.navbar-inner {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		max-width: 1100px;
+		width: 100%;
+		max-width: 1400px;
 		margin: 0 auto;
-		padding: 10px 14px;
-		transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		padding: 0 16px;
+		height: 100%;
+		position: relative;
 	}
 
 	.nav-left {
 		display: flex;
 		align-items: center;
+		gap: 12px;
 	}
 
-	.nav-logo {
-		width: 34px;
-		height: 34px;
-		background: rgba(255, 255, 255, 0.2);
-		border-radius: 8px;
+	.mobile-menu-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		background: transparent;
+		color: white;
+		border: none;
+		padding: 4px;
+		cursor: pointer;
+		border-radius: 6px;
+	}
+
+	.mobile-menu-btn:hover {
+		background: rgba(255, 255, 255, 0.1);
+	}
+
+	.mobile-scanner-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(255, 255, 255, 0.15);
+		color: white;
+		text-decoration: none;
+		padding: 6px;
+		border-radius: 8px;
+		transition: background 0.2s ease;
+	}
+
+	.mobile-scanner-btn:hover {
+		background: rgba(255, 255, 255, 0.25);
+	}
+
+	.nav-logo {
+		width: 36px;
+		height: 36px;
+		background: transparent;
+		border-radius: 10px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+	}
+
+	.logo-img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
 	}
 
 	.nav-center {
-		flex: 1;
+		position: absolute;
+		left: 50%;
+		transform: translateX(-50%);
 		text-align: center;
+		pointer-events: none;
 	}
 
 	.nav-title {
 		color: white;
-		font-size: 15px;
+		font-size: 16px;
 		font-weight: 700;
+		letter-spacing: -0.01em;
 		margin: 0;
 	}
 
 	.nav-right {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-	}
-
-	.scan-badge {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		line-height: 1;
-	}
-
-	.badge-number {
-		color: white;
-		font-size: 16px;
-		font-weight: 700;
-	}
-
-	.badge-label {
-		color: rgba(255, 255, 255, 0.7);
-		font-size: 10px;
-		font-weight: 500;
-	}
-
-	.scan-btn-desktop {
-		display: none;
-		align-items: center;
-		gap: 8px;
-		background: rgba(255, 255, 255, 0.2);
-		border: 1px solid rgba(255, 255, 255, 0.3);
-		border-radius: 10px;
-		color: white;
-		font-family: 'Inter', sans-serif;
-		font-size: 14px;
-		font-weight: 600;
-		padding: 10px 18px;
-		cursor: pointer;
-		transition: all 0.2s ease;
-	}
-
-	.scan-btn-desktop:hover {
-		background: rgba(255, 255, 255, 0.3);
-		transform: translateY(-1px);
+		gap: 16px;
+		margin-left: auto;
 	}
 
 	@media (min-width: 480px) {
 		.navbar-inner {
-			padding: 12px 20px;
+			padding: 0 20px;
 		}
 		.nav-title {
-			font-size: 17px;
+			font-size: 18px;
 		}
 	}
 
 	@media (min-width: 768px) {
 		.navbar-inner {
-			padding: 14px 24px;
-			max-width: none;
+			padding: 0 28px;
 		}
-		.nav-logo {
+		.mobile-menu-btn,
+		.mobile-scanner-btn {
 			display: none;
 		}
-		.nav-title {
-			font-size: 19px;
+		.nav-logo {
+			display: none; /* Sidebar handles logo on desktop */
 		}
-		.scan-btn-desktop {
-			display: flex;
+		.nav-center {
+			position: static;
+			transform: none;
+			text-align: left; /* Align left rather than center when on desktop */
+			flex: 1;
 		}
 	}
 </style>

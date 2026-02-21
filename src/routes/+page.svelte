@@ -1,51 +1,45 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import GuestList from '$lib/components/GuestList.svelte';
-	import BottomDock from '$lib/components/BottomDock.svelte';
-	import ScannerModal from '$lib/components/ScannerModal.svelte';
-
-	let scannerOpen = $state(false);
-	let scanCount = $state(0);
-	let guestListRef: GuestList | undefined = $state();
-
-	if (browser) {
-		scanCount = parseInt(localStorage.getItem('scanCount') || '0');
-	}
-
-	function openScanner() {
-		scannerOpen = true;
-	}
-
-	function onScanSuccess() {
-		if (browser) {
-			scanCount = parseInt(localStorage.getItem('scanCount') || '0');
-		}
-		guestListRef?.loadGuests();
-	}
-
-	function onScanClose() {
-		scannerOpen = false;
-	}
+	import Footer from '$lib/components/Footer.svelte';
 </script>
 
 <svelte:head>
-	<title>Event Entry Scanner</title>
+	<title>Guest List</title>
 </svelte:head>
 
-<Navbar {scanCount} onScanClick={openScanner} />
+<Navbar title="Guest List" />
 
 <main class="content">
-	<GuestList bind:this={guestListRef} />
+	<div class="page-container">
+		<GuestList />
+	</div>
+	<Footer />
 </main>
-
-<BottomDock onScanClick={openScanner} />
-<ScannerModal bind:open={scannerOpen} onSuccess={onScanSuccess} onClose={onScanClose} />
 
 <style>
 	.content {
 		flex: 1;
 		overflow-y: auto;
 		overflow-x: hidden;
+		display: flex;
+		flex-direction: column;
+		background: var(--bg-primary);
+	}
+
+	.page-container {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		max-width: 1400px;
+		margin: 0 auto;
+		width: 100%;
+		padding: 16px;
+	}
+
+	@media (min-width: 768px) {
+		.page-container {
+			padding: 24px;
+		}
 	}
 </style>
