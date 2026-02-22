@@ -1,6 +1,7 @@
 <script lang="ts">
 	let { title = 'Entry Scanner' }: { title?: string } = $props();
 	import { navState } from '$lib/navState.svelte';
+	import { page } from '$app/stores';
 </script>
 
 <header class="navbar">
@@ -36,24 +37,49 @@
 		</div>
 
 		<div class="nav-right">
-			<a href="/scanner" class="mobile-scanner-btn" aria-label="Go to Scanner">
-				<svg
-					width="20"
-					height="20"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
+			{#if $page.url.pathname === '/'}
+				<a
+					href="/guest-list"
+					class="mobile-action-btn"
+					title="Go to Guest List"
+					aria-label="Go to Guest List"
 				>
-					<path d="M7 3H3v4" />
-					<path d="M17 3h4v4" />
-					<path d="M21 17v4h-4" />
-					<path d="M3 17v4h4" />
-					<rect x="9" y="9" width="6" height="6" rx="1" />
-				</svg>
-			</a>
+					<svg
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+						<circle cx="9" cy="7" r="4"></circle>
+						<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+						<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+					</svg>
+				</a>
+			{:else}
+				<a href="/" class="mobile-action-btn" title="Go to Scanner" aria-label="Go to Scanner">
+					<svg
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M7 3H3v4" />
+						<path d="M17 3h4v4" />
+						<path d="M21 17v4h-4" />
+						<path d="M3 17v4h4" />
+						<rect x="9" y="9" width="6" height="6" rx="1" />
+					</svg>
+				</a>
+			{/if}
 		</div>
 	</div>
 </header>
@@ -105,7 +131,7 @@
 		background: rgba(255, 255, 255, 0.1);
 	}
 
-	.mobile-scanner-btn {
+	.mobile-action-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -117,7 +143,7 @@
 		transition: background 0.2s ease;
 	}
 
-	.mobile-scanner-btn:hover {
+	.mobile-action-btn:hover {
 		background: rgba(255, 255, 255, 0.25);
 	}
 
@@ -175,7 +201,7 @@
 			padding: 0 28px;
 		}
 		.mobile-menu-btn,
-		.mobile-scanner-btn {
+		.mobile-action-btn {
 			display: none;
 		}
 		.nav-logo {

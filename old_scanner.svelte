@@ -7,7 +7,7 @@
 	interface ScanEntry {
 		name: string;
 		email?: string;
-		status: 'success' | 'error' | 'duplicate';
+		status: 'success' | 'error';
 		message: string;
 		time: string;
 		isHistorical?: boolean;
@@ -21,8 +21,6 @@
 	let showResult = $state(false);
 	let cameraActive = $state(false);
 	let scanLocked = false;
-	let lastScannedCode = '';
-	let lastScannedTime = 0;
 	let resumeTimer: ReturnType<typeof setTimeout> | null = null;
 	let scanLog = $state<ScanEntry[]>([]);
 	let loadingHistory = $state(true);
@@ -65,8 +63,8 @@
 				name: g.name || 'Unknown',
 				email: g.email || '',
 				status: 'success' as const,
-				message: '',
-				time: new Date(g.scanTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+				message: 'Checked in',
+				time: new Date(g.scanTime).toLocaleTimeString(),
 				isHistorical: true
 			}));
 		} catch (err) {
@@ -114,12 +112,8 @@
 	}
 
 	async function onScanSuccess(decodedText: string) {
-		// Prevent duplicate callbacks for the same QR code within 5 seconds
-		const now = Date.now();
-		if (scanLocked || (decodedText === lastScannedCode && now - lastScannedTime < 5000)) return;
+		if (scanLocked) return;
 		scanLocked = true;
-		lastScannedCode = decodedText;
-		lastScannedTime = now;
 
 		await stopCamera();
 		scannerStatus = 'scanning';
@@ -144,8 +138,8 @@
 					{
 						name: data.name || 'Unknown',
 						status: 'success',
-						message: '',
-						time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+						message: 'Checked in',
+						time: new Date().toLocaleTimeString()
 					},
 					...scanLog
 				];
@@ -157,54 +151,30 @@
 					msg.includes('not pre-registered')
 				) {
 					scannerStatus = 'error';
-					statusText = 'Not Pre-registered';
 					resultTitle = 'Not Pre-registered';
 					resultMessage = 'This QR code is not on the guest list';
-
-					scanLog = [
-						{
-							name: data.name || resultTitle,
-							status: 'error',
-							message: resultMessage,
-							time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-						},
-						...scanLog
-					];
 				} else if (msg.includes('already') || msg.includes('duplicate')) {
-					// Extract name from message like "Already checked in: John Doe"
-					const nameFromMsg = data.name || data.message?.split(': ').slice(1).join(': ') || '';
 					scannerStatus = 'duplicate';
-					statusText = 'Already Attended!';
 					resultTitle = 'Already Checked In';
-					resultMessage = nameFromMsg
-						? `${nameFromMsg} has already attended`
+					resultMessage = data.name
+						? `${data.name} has already attended`
 						: 'This guest has already been scanned';
-
-					scanLog = [
-						{
-							name: nameFromMsg || 'Already Attended',
-							status: 'duplicate',
-							message: 'Already attended',
-							time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-						},
-						...scanLog
-					];
 				} else {
 					scannerStatus = 'error';
-					statusText = 'QR Not Recognized';
 					resultTitle = 'QR Not Recognized';
 					resultMessage = 'Could not process this QR code';
-
-					scanLog = [
-						{
-							name: data.name || resultTitle,
-							status: 'error',
-							message: resultMessage,
-							time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-						},
-						...scanLog
-					];
 				}
+				statusText = resultTitle;
+
+				scanLog = [
+					{
+						name: data.name || resultTitle,
+						status: 'error',
+						message: resultMessage,
+						time: new Date().toLocaleTimeString()
+					},
+					...scanLog
+				];
 			}
 		} catch {
 			scannerStatus = 'error';
@@ -217,7 +187,7 @@
 					name: 'Connection Error',
 					status: 'error',
 					message: 'Could not reach server',
-					time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+					time: new Date().toLocaleTimeString()
 				},
 				...scanLog
 			];
@@ -273,23 +243,6 @@
 							<div class="corner bl"></div>
 							<div class="corner br"></div>
 							<div class="scan-line"></div>
-						</div>
-
-						<div class="controls">
-							<div class="status-bar">
-								<span class="status-dot {scannerStatus}"></span>
-								<span class="status-text">{statusText}</span>
-							</div>
-
-							{#if showResult && scannerStatus === 'error'}
-								<div class="result-row {scannerStatus}">
-									<span class="result-emoji">❌</span>
-									<div class="result-info">
-										<div class="result-title">{resultTitle}</div>
-										<div class="result-message">{resultMessage}</div>
-									</div>
-								</div>
-							{/if}
 						</div>
 					</div>
 					<!-- Fullscreen button overlay: top-left of camera area -->
@@ -357,6 +310,29 @@
 							<path d="M21 11.8v2a4 4 0 0 1-4 4H4.2" />
 						</svg>
 					</button>
+
+					<div class="controls">
+						<div class="status-bar">
+							<span class="status-dot {scannerStatus}"></span>
+							<span class="status-text">{statusText}</span>
+						</div>
+
+						{#if showResult}
+							<div class="result-row {scannerStatus}">
+								<span class="result-emoji"
+									>{scannerStatus === 'success'
+										? '✅'
+										: scannerStatus === 'duplicate'
+											? '⚠️'
+											: '❌'}</span
+								>
+								<div class="result-info">
+									<div class="result-title">{resultTitle}</div>
+									<div class="result-message">{resultMessage}</div>
+								</div>
+							</div>
+						{/if}
+					</div>
 				</div>
 			</div>
 
@@ -399,54 +375,10 @@
 								class="log-item"
 								class:success={entry.status === 'success'}
 								class:error={entry.status === 'error'}
-								class:duplicate={entry.status === 'duplicate'}
 								style="animation-delay: {i * 0.03}s"
 							>
 								<div class="log-icon">
-									{#if entry.status === 'success'}
-										<svg
-											width="20"
-											height="20"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2.5"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											class="icon-success"
-											><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline
-												points="22 4 12 14.01 9 11.01"
-											></polyline></svg
-										>
-									{:else if entry.status === 'duplicate'}
-										<svg
-											width="20"
-											height="20"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2.5"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											class="icon-duplicate"
-											><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"
-											></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg
-										>
-									{:else}
-										<svg
-											width="20"
-											height="20"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2.5"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											class="icon-error"
-											><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"
-											></line><line x1="9" y1="9" x2="15" y2="15"></line></svg
-										>
-									{/if}
+									{entry.status === 'success' ? '✅' : '❌'}
 								</div>
 								<div class="log-details">
 									<div class="log-name">{entry.name}</div>
@@ -498,7 +430,7 @@
 		padding: 16px;
 	}
 
-	@media (min-width: 768px) and (min-aspect-ratio: 1/1) {
+	@media (min-width: 768px) {
 		.page-container {
 			padding: 24px;
 		}
@@ -523,17 +455,6 @@
 		background: #000;
 		flex: 6;
 		min-height: 50vh; /* Minimum height for camera on mobile before scrolling */
-		position: relative;
-		/* Base size for the scanner UI - slightly reduced height constraint to leave room for buttons */
-		--scan-size: min(75vw, 68vh, 280px);
-	}
-
-	@media (min-width: 768px) and (min-aspect-ratio: 1/1) {
-		.camera-panel {
-			/* On desktop/tablet, constrain it tightly within the smaller flex container */
-			/* Using an absolute max of 280px guarantees it will never spill out or break the grid layout */
-			--scan-size: min(60vw, 68vh, 280px);
-		}
 	}
 
 	.camera-area {
@@ -614,12 +535,8 @@
 		pointer-events: none;
 		z-index: 2;
 		display: flex;
-		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		padding: 16px;
-		box-sizing: border-box;
-		transition: padding-top 0.3s ease;
 	}
 
 	.scan-overlay::before {
@@ -632,11 +549,9 @@
 	.scan-focus {
 		position: relative;
 		z-index: 1;
-		width: var(--scan-size);
-		height: var(--scan-size);
+		width: min(72vw, 72vh, 280px);
+		height: min(72vw, 72vh, 280px);
 		box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-		flex-shrink: 0;
-		box-sizing: border-box;
 	}
 
 	.corner {
@@ -699,29 +614,30 @@
 		}
 	}
 
+	/* === Controls === */
 	.controls {
 		position: absolute;
-		top: calc(50% + (var(--scan-size) / 2) + 16px);
-		width: var(--scan-size);
-		max-width: 100%;
+		bottom: 24px;
+		left: 0;
+		right: 0;
+		z-index: 10;
 		display: flex;
 		flex-direction: column;
-		align-items: stretch;
-		gap: 12px;
-		z-index: 10;
-		pointer-events: auto;
-		flex-shrink: 0;
-		box-sizing: border-box;
+		align-items: center;
+		gap: 10px;
+		padding: 0 16px;
 	}
 
 	.status-bar {
-		background: transparent;
-		padding: 12px 0;
+		background: #ffffff;
+		border-radius: 9999px; /* Pill shape */
+		padding: 10px 20px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 8px;
-		width: 100%;
+		gap: 10px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+		width: min(72vw, 72vh, 280px); /* Exactly match the scan-focus width */
 		box-sizing: border-box;
 	}
 
@@ -733,8 +649,8 @@
 
 	.fullscreen-btn {
 		position: absolute;
-		top: 12px;
-		left: 12px;
+		top: 16px;
+		left: 16px;
 		z-index: 10;
 		background: transparent;
 		border: none;
@@ -755,8 +671,8 @@
 
 	.switch-camera-btn {
 		position: absolute;
-		top: 12px;
-		right: 12px;
+		top: 16px;
+		right: 16px;
 		z-index: 10;
 		background: transparent;
 		border: none;
@@ -773,17 +689,6 @@
 
 	.switch-camera-btn:hover {
 		opacity: 0.8;
-	}
-
-	@media (min-width: 768px) {
-		.fullscreen-btn {
-			top: 20px;
-			left: 20px;
-		}
-		.switch-camera-btn {
-			top: 20px;
-			right: 20px;
-		}
 	}
 
 	/* === Global fullscreen: hide sidebar/navbar/footer, show scanner grid only === */
@@ -804,21 +709,15 @@
 		flex-direction: column;
 		width: 100vw;
 		height: 100dvh;
-		padding: 0 !important;
+		padding: 0; /* Remove 20px padding to maximize mobile space */
 		box-sizing: border-box;
-		background: #2a0000 !important;
+		background: #2a0000;
 	}
 
 	@media (min-width: 768px) {
 		:global(:fullscreen .content) {
-			padding: 20px !important;
+			padding: 20px; /* Restore padding on desktop */
 		}
-	}
-
-	:global(:fullscreen .page-container) {
-		padding: 0 !important;
-		max-width: 100% !important;
-		height: 100%;
 	}
 
 	:global(:fullscreen .scanner-grid) {
@@ -827,9 +726,9 @@
 		flex: 1;
 		height: 100%;
 		background: var(--bg-sidebar);
-		border-radius: 16px !important;
+		border-radius: 16px;
 		border: 1px solid #ffffff !important;
-		box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6) !important;
+		box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
 		overflow: hidden;
 	}
 
@@ -847,10 +746,10 @@
 
 	:global(:fullscreen .log-panel) {
 		flex: 4;
-		border-left: none !important;
-		border-top: 1px solid rgba(0, 0, 0, 0.1) !important;
-		background: #ffffff !important;
-		min-height: auto !important;
+		border-left: none;
+		border-top: 1px solid rgba(0, 0, 0, 0.1);
+		background: #ffffff;
+		min-height: auto;
 	}
 
 	@media (min-width: 768px) {
@@ -859,177 +758,127 @@
 		}
 
 		:global(:fullscreen .log-panel) {
-			border-top: none !important;
-			border-left: 1px solid rgba(0, 0, 0, 0.1) !important;
+			border-top: none;
+			border-left: 1px solid rgba(0, 0, 0, 0.1);
 		}
 	}
 
 	:global(:fullscreen .controls) {
-		position: absolute !important;
-		top: calc(50% + (var(--scan-size) / 2) + 16px) !important;
-		width: var(--scan-size) !important;
-		display: flex !important;
-		flex-direction: column !important;
-		align-items: center !important;
-		z-index: 10 !important;
+		bottom: 32px;
+		left: 0;
+		right: 0;
 	}
 
 	:global(:fullscreen .status-bar) {
-		background: transparent !important;
-		border-radius: 0 !important;
-		width: auto !important;
-		padding: 10px 0 !important;
-		box-shadow: none !important;
-		gap: 10px !important;
-		display: flex !important;
-		align-items: center !important;
-		justify-content: center !important;
+		background: #ffffff;
 	}
 
 	:global(:fullscreen .status-text) {
-		color: #ffffff !important;
-		text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8) !important;
+		color: #800000;
 	}
 
 	:global(:fullscreen .log-header) {
-		background: #ffffff !important;
-		border-bottom-color: rgba(0, 0, 0, 0.1) !important;
+		background: #ffffff;
+		border-bottom-color: rgba(0, 0, 0, 0.1);
 	}
 
 	:global(:fullscreen .log-count) {
-		background: #f1f5f9 !important;
-		color: #64748b !important;
-	}
-
-	:global(:fullscreen .log-title) {
-		color: #0f172a !important;
-	}
-
-	:global(:fullscreen .log-empty) {
-		color: #64748b !important;
-	}
-
-	:global(:fullscreen .log-empty p) {
-		color: #334155 !important;
-	}
-
-	:global(:fullscreen .log-name) {
-		color: #0f172a !important;
-	}
-
-	:global(:fullscreen .log-message),
-	:global(:fullscreen .log-time),
-	:global(:fullscreen .log-email) {
-		color: #64748b !important;
+		background: var(--bg-primary);
+		color: var(--text-secondary);
 	}
 
 	:global(:fullscreen .log-item) {
-		border-bottom-color: rgba(0, 0, 0, 0.05) !important;
+		border-bottom-color: rgba(0, 0, 0, 0.05);
 	}
 
-	/* === Status Dot === */
+	/* Webkit prefix for Safari */
+	:global(:-webkit-full-screen .sidebar) {
+		display: none !important;
+	}
+	:global(:-webkit-full-screen .navbar) {
+		display: none !important;
+	}
+	:global(:-webkit-full-screen .footer) {
+		display: none !important;
+	}
+
 	.status-dot {
-		width: 10px;
-		height: 10px;
+		width: 8px;
+		height: 8px;
 		border-radius: 50%;
-		display: inline-block;
-		background: rgba(255, 255, 255, 0.5);
 		flex-shrink: 0;
 	}
-
 	.status-dot.scanning {
 		background: #22c55e;
-		animation: pulse 1.5s ease-in-out infinite;
+		animation: pulse-dot 1.5s ease-in-out infinite;
 	}
-
 	.status-dot.success {
-		background: #22c55e;
+		background: #4ade80;
 	}
-
 	.status-dot.error {
 		background: #ef4444;
 	}
-
 	.status-dot.duplicate {
 		background: #f59e0b;
-	}
-
-	@keyframes pulse {
-		0%,
-		100% {
-			opacity: 1;
-		}
-		50% {
-			opacity: 0.4;
-		}
+		animation: pulse-dot 1s ease-in-out infinite;
 	}
 
 	.status-text {
-		color: rgba(255, 255, 255, 0.9);
-		font-size: 14px;
+		color: #800000;
+		font-size: 13px;
 		font-weight: 500;
 	}
 
-	/* === Result Row === */
 	.result-row {
 		display: flex;
 		align-items: center;
 		gap: 12px;
 		padding: 14px 16px;
 		border-radius: 12px;
-		background: rgba(0, 0, 0, 0.6);
-		border: 1px solid rgba(255, 255, 255, 0.1);
 		width: 100%;
-		box-sizing: border-box;
+		max-width: 320px;
 	}
-
+	.result-row.success {
+		background: rgba(34, 197, 94, 0.15);
+		border: 1px solid rgba(34, 197, 94, 0.3);
+	}
 	.result-row.error {
-		border-color: rgba(239, 68, 68, 0.4);
 		background: rgba(239, 68, 68, 0.15);
+		border: 1px solid rgba(239, 68, 68, 0.3);
 	}
-
 	.result-row.duplicate {
-		border-color: rgba(245, 158, 11, 0.4);
 		background: rgba(245, 158, 11, 0.15);
+		border: 1px solid rgba(245, 158, 11, 0.4);
 	}
 
 	.result-emoji {
-		font-size: 22px;
-		line-height: 1;
+		font-size: 28px;
 		flex-shrink: 0;
 	}
-
 	.result-info {
-		flex: 1;
 		min-width: 0;
 	}
-
 	.result-title {
-		font-size: 13px;
-		font-weight: 600;
-		color: rgba(255, 255, 255, 0.95);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		color: white;
+		font-size: 14px;
+		font-weight: 700;
 	}
-
 	.result-message {
+		color: rgba(255, 255, 255, 0.5);
 		font-size: 12px;
-		color: rgba(255, 255, 255, 0.6);
-		margin-top: 2px;
-		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
-	/* === Log Panel === */
+	/* === Scan Log Panel === */
 	.log-panel {
 		display: flex;
 		flex-direction: column;
-		background: var(--bg-secondary);
-		border-top: 1px solid var(--border-color);
 		flex: 4;
-		min-height: 0;
+		min-height: 250px;
+		background: #fff;
+		border-top: 1px solid var(--border-color);
 	}
 
 	.log-header {
@@ -1042,41 +891,107 @@
 	}
 
 	.log-title {
-		font-size: 15px;
-		font-weight: 600;
+		font-size: 16px;
+		font-weight: 700;
 		color: var(--text-primary);
 		margin: 0;
 	}
 
 	.log-count {
 		font-size: 12px;
-		color: var(--text-muted);
-		background: var(--bg-tertiary, rgba(0, 0, 0, 0.05));
-		padding: 3px 8px;
+		font-weight: 600;
+		color: var(--text-secondary);
+		background: var(--bg-primary);
+		padding: 4px 10px;
 		border-radius: 20px;
 	}
 
 	.log-list {
 		flex: 1;
 		overflow-y: auto;
-		padding: 8px 0;
+		padding: 0;
+	}
+
+	.log-empty {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 40px 20px;
+		color: var(--text-secondary);
+		gap: 8px;
+	}
+	.log-empty p {
+		margin: 0;
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.log-empty span {
+		font-size: 12px;
+		opacity: 0.7;
+	}
+
+	.log-item {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 14px 20px;
+		border-bottom: 1px solid var(--border-color);
+		animation: fadeIn 0.3s ease-out forwards;
+		opacity: 0;
+	}
+
+	.log-icon {
+		font-size: 20px;
+		flex-shrink: 0;
+	}
+
+	.log-details {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.log-name {
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--text-primary);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.log-message {
+		font-size: 12px;
+		color: var(--text-secondary);
+		margin-top: 2px;
+	}
+
+	.log-email {
+		font-size: 11px;
+		color: var(--text-secondary);
+		margin-top: 2px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		opacity: 0.75;
 	}
 
 	.log-loading {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 12px;
+		justify-content: center;
 		padding: 40px 20px;
-		color: var(--text-muted);
+		color: var(--text-secondary);
+		gap: 12px;
 		font-size: 13px;
 	}
 
 	.spinner {
-		width: 24px;
-		height: 24px;
-		border: 2px solid var(--border-color);
-		border-top-color: var(--accent-color, #800000);
+		width: 28px;
+		height: 28px;
+		border: 3px solid var(--border-color);
+		border-top-color: #800000;
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}
@@ -1087,44 +1002,18 @@
 		}
 	}
 
-	.log-empty {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 8px;
-		padding: 48px 20px;
-		color: var(--text-muted);
-		text-align: center;
-	}
-
-	.log-empty svg {
-		opacity: 0.3;
-	}
-
-	.log-empty p {
-		font-size: 14px;
-		font-weight: 600;
-		margin: 0;
+	.log-time {
+		font-size: 11px;
+		font-weight: 500;
 		color: var(--text-secondary);
+		white-space: nowrap;
+		flex-shrink: 0;
 	}
 
-	.log-empty span {
-		font-size: 12px;
-	}
-
-	.log-item {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		padding: 12px 20px;
-		border-bottom: 1px solid var(--border-color);
-		animation: slideIn 0.3s ease both;
-	}
-
-	@keyframes slideIn {
+	@keyframes fadeIn {
 		from {
 			opacity: 0;
-			transform: translateY(-6px);
+			transform: translateY(-8px);
 		}
 		to {
 			opacity: 1;
@@ -1132,71 +1021,43 @@
 		}
 	}
 
-	.log-icon {
-		width: 36px;
-		height: 36px;
-		min-width: 36px;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: rgba(0, 0, 0, 0.05);
+	@keyframes pulse-dot {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.3;
+		}
 	}
 
-	.log-item.success .log-icon {
-		background: rgba(34, 197, 94, 0.1);
-		color: #22c55e;
-	}
+	/* Desktop: 70/30 grid */
+	@media (min-width: 768px) {
+		.scanner-grid {
+			flex-direction: row;
+		}
 
-	.log-item.error .log-icon {
-		background: rgba(239, 68, 68, 0.1);
-		color: #ef4444;
-	}
+		.camera-panel {
+			flex: 7;
+			min-width: 0;
+		}
 
-	.log-item.duplicate .log-icon {
-		background: rgba(245, 158, 11, 0.1);
-		color: #f59e0b;
-	}
+		.camera-area {
+			aspect-ratio: auto;
+			max-height: none;
+			flex: 1;
+		}
 
-	.icon-success {
-		color: #22c55e;
-	}
+		.log-panel {
+			flex: 0 0 30%;
+			min-height: auto;
+			border-top: none;
+			border-left: 1px solid var(--border-color);
+		}
 
-	.icon-error {
-		color: #ef4444;
-	}
-
-	.icon-duplicate {
-		color: #f59e0b;
-	}
-
-	.log-details {
-		flex: 1;
-		min-width: 0;
-	}
-
-	.log-name {
-		font-size: 13px;
-		font-weight: 600;
-		color: var(--text-primary);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.log-email,
-	.log-message {
-		font-size: 11px;
-		color: var(--text-muted);
-		margin-top: 2px;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.log-time {
-		font-size: 11px;
-		color: var(--text-muted);
-		flex-shrink: 0;
+		.scan-focus {
+			width: min(50%, 320px);
+			height: min(50%, 320px);
+		}
 	}
 </style>

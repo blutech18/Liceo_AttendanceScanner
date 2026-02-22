@@ -364,9 +364,13 @@
 							<tbody>
 								{#each pagedGuests as guest, i}
 									<tr>
-										<td class="col-num">{(currentPage - 1) * pageSize + i + 1}</td>
+										<td class="col-num" data-index="{(currentPage - 1) * pageSize + i + 1}. ">
+											{(currentPage - 1) * pageSize + i + 1}
+										</td>
 										<td class="col-name">
-											<div class="guest-name">{guest.name}</div>
+											<div class="guest-name" data-index="{(currentPage - 1) * pageSize + i + 1}. ">
+												{guest.name}
+											</div>
 											{#if guest.email}
 												<div class="guest-email">{guest.email}</div>
 											{/if}
@@ -912,6 +916,88 @@
 		text-align: center;
 	}
 
+	/* Mobile CSS Card Layout Override (2x2 Grid) */
+	@media (max-width: 479px) {
+		.guest-table,
+		.guest-table tbody,
+		.guest-table td {
+			display: block;
+			width: 100%;
+		}
+
+		.guest-table thead {
+			display: none;
+		}
+
+		.guest-table td {
+			border: none;
+			padding: 0;
+			text-align: left;
+		}
+
+		.guest-table td.col-num {
+			display: none;
+		}
+
+		.guest-table tr {
+			display: grid;
+			grid-template-columns: 1fr auto;
+			grid-template-areas:
+				'name status'
+				'name time';
+			gap: 2px 14px;
+			align-items: center;
+			padding: 16px;
+			border-bottom: 1px solid var(--border-color);
+			background: #fff;
+		}
+
+		.guest-table td.col-name {
+			grid-area: name;
+			display: flex;
+			flex-direction: column;
+			gap: 4px;
+			padding: 0;
+		}
+
+		.guest-name {
+			margin: 0;
+			font-size: 15px;
+			display: flex;
+			align-items: baseline;
+		}
+
+		.guest-name::before {
+			content: attr(data-index);
+			font-weight: 700;
+			color: var(--text-secondary);
+			margin-right: 2px;
+			font-size: 14px;
+		}
+
+		.guest-email {
+			margin: 0;
+			font-size: 13px;
+			padding-left: 0;
+		}
+
+		.guest-table td.col-status {
+			grid-area: status;
+			padding: 0;
+			text-align: center;
+			align-self: end;
+		}
+
+		.guest-table td.col-time {
+			display: block;
+			grid-area: time;
+			text-align: center;
+			font-size: 12px;
+			color: var(--text-secondary);
+			align-self: start;
+		}
+	}
+
 	.time-mobile {
 		display: inline;
 		color: var(--text-secondary);
@@ -993,6 +1079,27 @@
 
 	/* >=480px */
 	@media (min-width: 480px) {
+		.guest-table {
+			display: table;
+		}
+
+		.guest-table thead {
+			display: table-header-group;
+		}
+
+		.guest-table tbody {
+			display: table-row-group;
+		}
+
+		.guest-table tr {
+			display: table-row;
+		}
+
+		.guest-table td,
+		.guest-table th {
+			display: table-cell;
+		}
+
 		.guest-table td {
 			padding: 18px 16px;
 			font-size: 14px;
