@@ -3,10 +3,10 @@
 	import Footer from '$lib/components/Footer.svelte';
 
 	const developers = [
-		{ name: 'Mark Elvin Daguplo', role: 'Developer', initials: 'MD' },
-		{ name: 'Developer 2', role: 'Developer', initials: 'D2' },
-		{ name: 'Developer 3', role: 'Developer', initials: 'D3' },
-		{ name: 'Developer 4', role: 'Developer', initials: 'D4' }
+		{ name: 'Dr. Marco Marvin Rado', role: 'Developer', initials: 'MR' },
+		{ name: 'Harley Busa', role: 'Developer', initials: 'HB' },
+		{ name: 'Marsh Ivan Quintila', role: 'Developer', initials: 'MQ' },
+		{ name: 'Cristan Jade Jumawan', role: 'Developer', initials: 'CJ' }
 	];
 </script>
 
