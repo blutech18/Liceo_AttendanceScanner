@@ -40,16 +40,28 @@
 		}, 100);
 	}
 
+	// Detect iOS Safari which doesn't support standard Fullscreen API
+	const isIOS = browser && /iphone|ipad|ipod/i.test(navigator.userAgent);
+
 	function toggleFullscreen() {
-		if (!document.fullscreenElement) {
-			document.documentElement.requestFullscreen();
+		if (isIOS) {
+			// iOS fallback: toggle a CSS pseudo-fullscreen class on the root element
+			isFullscreen = !isFullscreen;
+			document.documentElement.classList.toggle('ios-fullscreen', isFullscreen);
+			return;
+		}
+		const el = document.documentElement as any;
+		if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+			if (el.requestFullscreen) el.requestFullscreen();
+			else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
 		} else {
-			document.exitFullscreen();
+			if (document.exitFullscreen) document.exitFullscreen();
+			else if ((document as any).webkitExitFullscreen) (document as any).webkitExitFullscreen();
 		}
 	}
 
 	function onFullscreenChange() {
-		isFullscreen = !!document.fullscreenElement;
+		isFullscreen = !!document.fullscreenElement || !!(document as any).webkitFullscreenElement;
 	}
 
 	async function loadHistoricalScans() {
@@ -240,10 +252,12 @@
 		loadHistoricalScans();
 		setTimeout(() => startCamera(), 200);
 		document.addEventListener('fullscreenchange', onFullscreenChange);
+		document.addEventListener('webkitfullscreenchange', onFullscreenChange);
 	});
 
 	onDestroy(() => {
 		document.removeEventListener('fullscreenchange', onFullscreenChange);
+		document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
 		if (resumeTimer) {
 			clearTimeout(resumeTimer);
 			resumeTimer = null;
@@ -524,8 +538,8 @@
 		flex: 6;
 		min-height: 50vh; /* Minimum height for camera on mobile before scrolling */
 		position: relative;
-		/* Base size for the scanner UI - slightly reduced height constraint to leave room for buttons */
-		--scan-size: min(75vw, 68vh, 280px);
+		/* Base size for the scanner UI - capped at 220px on mobile to always leave room for the status text */
+		--scan-size: min(70vw, 50vh, 220px);
 	}
 
 	@media (min-width: 768px) and (min-aspect-ratio: 1/1) {
@@ -701,13 +715,13 @@
 
 	.controls {
 		position: absolute;
-		top: calc(50% + (var(--scan-size) / 2) + 16px);
+		top: calc(50% + (var(--scan-size) / 2) + 8px);
 		width: var(--scan-size);
 		max-width: 100%;
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
-		gap: 12px;
+		gap: 8px;
 		z-index: 10;
 		pointer-events: auto;
 		flex-shrink: 0;
@@ -715,14 +729,16 @@
 	}
 
 	.status-bar {
-		background: transparent;
-		padding: 12px 0;
+		background: rgba(255, 255, 255, 0.96);
+		border-radius: 100px;
+		padding: 8px 20px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		gap: 8px;
 		width: 100%;
 		box-sizing: border-box;
+		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
 	}
 
 	/* Added safe area padding for modern mobile notches inside fullscreen */
@@ -866,7 +882,7 @@
 
 	:global(:fullscreen .controls) {
 		position: absolute !important;
-		top: calc(50% + (var(--scan-size) / 2) + 16px) !important;
+		top: calc(50% + (var(--scan-size) / 2) + 8px) !important;
 		width: var(--scan-size) !important;
 		display: flex !important;
 		flex-direction: column !important;
@@ -875,11 +891,11 @@
 	}
 
 	:global(:fullscreen .status-bar) {
-		background: transparent !important;
-		border-radius: 0 !important;
-		width: auto !important;
-		padding: 10px 0 !important;
-		box-shadow: none !important;
+		background: rgba(255, 255, 255, 0.96) !important;
+		border-radius: 100px !important;
+		width: 100% !important;
+		padding: 8px 20px !important;
+		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25) !important;
 		gap: 10px !important;
 		display: flex !important;
 		align-items: center !important;
@@ -887,8 +903,59 @@
 	}
 
 	:global(:fullscreen .status-text) {
-		color: #ffffff !important;
-		text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8) !important;
+		color: #1a1a1a !important;
+		font-weight: 600 !important;
+		text-shadow: none !important;
+	}
+
+	/* === iOS Safari pseudo-fullscreen (CSS fallback) === */
+	:global(.ios-fullscreen .sidebar) {
+		display: none !important;
+	}
+	:global(.ios-fullscreen .navbar) {
+		display: none !important;
+	}
+	:global(.ios-fullscreen .footer) {
+		display: none !important;
+	}
+	:global(.ios-fullscreen .content) {
+		position: fixed !important;
+		inset: 0 !important;
+		z-index: 9999 !important;
+		width: 100vw !important;
+		height: 100dvh !important;
+		padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0 !important;
+		background: #000 !important;
+		box-sizing: border-box !important;
+		display: flex !important;
+		flex-direction: column !important;
+	}
+	:global(.ios-fullscreen .page-container) {
+		padding: 0 !important;
+		max-width: 100% !important;
+		height: 100%;
+	}
+	:global(.ios-fullscreen .scanner-grid) {
+		display: flex !important;
+		flex-direction: column !important;
+		flex: 1 !important;
+		height: 100% !important;
+		background: #000 !important;
+		border-radius: 0 !important;
+		border: none !important;
+		overflow: hidden !important;
+	}
+	:global(.ios-fullscreen .log-panel) {
+		display: none !important;
+	}
+	:global(.ios-fullscreen .camera-panel) {
+		flex: 1 !important;
+		min-height: 0 !important;
+	}
+	:global(.ios-fullscreen .camera-area) {
+		flex: 1 !important;
+		aspect-ratio: auto !important;
+		max-height: none !important;
 	}
 
 	:global(:fullscreen .log-header) {
@@ -965,9 +1032,9 @@
 	}
 
 	.status-text {
-		color: rgba(255, 255, 255, 0.9);
+		color: #1a1a1a;
 		font-size: 14px;
-		font-weight: 500;
+		font-weight: 600;
 	}
 
 	/* === Result Row === */

@@ -293,17 +293,4 @@
 			font-size: 13px;
 		}
 	}
-
-	@media (max-width: 480px) {
-		.dev-grid {
-			grid-template-columns: 1fr;
-			max-width: 280px;
-			margin: 0 auto;
-			width: 100%;
-		}
-		.dev-card {
-			aspect-ratio: auto;
-			height: 200px;
-		}
-	}
 </style>

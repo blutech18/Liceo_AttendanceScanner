@@ -2,8 +2,23 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import { navState } from '$lib/navState.svelte';
+	import { onMount, onDestroy } from 'svelte';
 
 	let { collapsed = $bindable(false) } = $props();
+
+	let isMobile = $state(false);
+	let mql: MediaQueryList | undefined;
+
+	onMount(() => {
+		mql = window.matchMedia('(max-width: 767px)');
+		isMobile = mql.matches;
+		mql.addEventListener('change', (e) => {
+			isMobile = e.matches;
+		});
+	});
+	onDestroy(() => {
+		mql?.removeEventListener('change', () => {});
+	});
 
 	function toggle(e: Event) {
 		e.preventDefault();
@@ -15,6 +30,8 @@
 	}
 
 	function expand() {
+		// Only expand on desktop — on mobile the sidebar is a full drawer
+		if (isMobile) return;
 		if (collapsed) {
 			collapsed = false;
 			if (browser) {
@@ -221,7 +238,7 @@
 
 	@media (max-width: 767px) {
 		.toggle-btn {
-			display: none;
+			display: none; /* never show toggle button on mobile */
 		}
 
 		.sidebar.collapsed {
