@@ -6,8 +6,10 @@
 		name: string;
 		email: string;
 		type: string;
+		certId: string;
 		scanTime: string | null;
 		attended: boolean;
+		proofOfPayment: string;
 	}
 
 	let guests = $state<Guest[]>([]);
@@ -21,6 +23,121 @@
 	let searchFocused = $state(false);
 	let intervalId: ReturnType<typeof setInterval> | null = null;
 	let showFilters = $state(false);
+	let paymentFilter = $state('all');
+
+	// Payment Modal State
+	let showPaymentModal = $state(false);
+	let selectedPaymentImages = $state<string[]>([]);
+	let selectedPaymentOriginals = $state<string[]>([]);
+	let selectedPaymentFileIds = $state<string[]>([]);
+	let paymentModalNote = $state<string | null>(null);
+	let guestForPayment = $state<Guest | null>(null);
+	let approvingCertId = $state<string | null>(null);
+	let revokingCertId = $state<string | null>(null);
+
+	// Mark as Paid modal (for Not Paid → open modal → Mark as Paid)
+	let showMarkPaidModal = $state(false);
+	let guestForMarkPaid = $state<Guest | null>(null);
+
+	function openMarkPaidModal(guest: Guest) {
+		guestForMarkPaid = guest;
+		showMarkPaidModal = true;
+	}
+
+	function closeMarkPaidModal() {
+		showMarkPaidModal = false;
+		guestForMarkPaid = null;
+	}
+
+	function isPaid(proof: string | null | undefined): boolean {
+		return !!proof && proof !== 'NOT PAID';
+	}
+
+	function openPaymentModal(guest: Guest) {
+		const proof = guest.proofOfPayment;
+		if (!isPaid(proof)) return;
+		guestForPayment = guest;
+
+		const rawParts = proof
+			.split(',')
+			.map((s) => s.trim())
+			.filter(Boolean);
+
+		const urls: string[] = [];
+		const previewUrls: string[] = [];
+		const fileIds: string[] = [];
+		for (const part of rawParts) {
+			const match = part.match(/id=([^&]+)/) || part.match(/\/d\/([a-zA-Z0-9_-]+)/);
+			if (match && match[1]) {
+				urls.push(part);
+				previewUrls.push(`https://drive.google.com/file/d/${match[1]}/preview`);
+				fileIds.push(match[1]);
+			}
+		}
+
+		selectedPaymentOriginals = urls;
+		selectedPaymentImages = previewUrls;
+		selectedPaymentFileIds = fileIds;
+		paymentModalNote = urls.length === 0 ? proof : null;
+		showPaymentModal = true;
+	}
+
+	function closePaymentModal() {
+		showPaymentModal = false;
+		guestForPayment = null;
+		selectedPaymentImages = [];
+		selectedPaymentOriginals = [];
+		selectedPaymentFileIds = [];
+		paymentModalNote = null;
+	}
+
+	async function markAsPaidCash(guest: Guest) {
+		if (!guest.certId) return;
+		approvingCertId = guest.certId;
+		try {
+			const res = await fetch('/api/approve-payment', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ certId: guest.certId })
+			});
+			const data = await res.json();
+			if (data.success) {
+				closeMarkPaidModal();
+				await loadGuests();
+			} else {
+				alert(data.message || 'Failed to mark as paid');
+			}
+		} catch (e) {
+			console.error(e);
+			alert('Failed to mark as paid');
+		} finally {
+			approvingCertId = null;
+		}
+	}
+
+	async function markAsNotPaid(guest: Guest) {
+		if (!guest.certId) return;
+
+		revokingCertId = guest.certId;
+		try {
+			const res = await fetch('/api/revoke-payment', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ certId: guest.certId })
+			});
+			const data = await res.json();
+			if (data.success) {
+				closePaymentModal();
+				await loadGuests();
+			} else {
+				console.error(data.message || 'Failed to mark as not paid');
+			}
+		} catch (e) {
+			console.error('Failed to mark as not paid', e);
+		} finally {
+			revokingCertId = null;
+		}
+	}
 
 	let attendedCount = $derived(guests.filter((g) => g.attended).length);
 	let totalCount = $derived(guests.length);
@@ -60,6 +177,13 @@
 			list = list.filter((g) => g.attended);
 		} else if (filter === 'notyet') {
 			list = list.filter((g) => !g.attended);
+		}
+
+		// Payment filter
+		if (paymentFilter === 'paid') {
+			list = list.filter((g) => isPaid(g.proofOfPayment));
+		} else if (paymentFilter === 'notpaid') {
+			list = list.filter((g) => !isPaid(g.proofOfPayment));
 		}
 
 		// Search filter
@@ -113,6 +237,7 @@
 	$effect(() => {
 		filter;
 		typeFilter;
+		paymentFilter;
 		sort;
 		pageSize;
 		search;
@@ -151,8 +276,10 @@
 							name: r.name || '',
 							email: r.email || '',
 							type: (r.type || r.participantType || r.category || '').trim(),
+							certId: r.certId || '',
 							scanTime: match ? match.scanTime || null : null,
-							attended: !!match
+							attended: !!match,
+							proofOfPayment: r.proofOfPayment || 'NOT PAID'
 						};
 					});
 				} else if (data.attendees) {
@@ -160,8 +287,10 @@
 						name: a.name || '',
 						email: a.email || '',
 						type: (a.type || a.participantType || a.category || '').trim(),
+						certId: a.certId || '',
 						scanTime: a.scanTime || null,
-						attended: true
+						attended: true,
+						proofOfPayment: a.proofOfPayment || 'NOT PAID'
 					}));
 				}
 			}
@@ -293,6 +422,11 @@
 						<option value="newest">Sort: Newest</option>
 						<option value="oldest">Sort: Oldest</option>
 					</select>
+					<select class="filter-select integrated" bind:value={paymentFilter}>
+						<option value="all">Payment: All</option>
+						<option value="paid">Payment: Paid</option>
+						<option value="notpaid">Payment: Not Paid</option>
+					</select>
 					<button
 						class="refresh-btn inline"
 						class:spinning={refreshing}
@@ -357,6 +491,7 @@
 								<tr>
 									<th class="col-num">#</th>
 									<th class="col-name">Name</th>
+									<th class="col-payment">Payment</th>
 									<th class="col-time">Time</th>
 									<th class="col-status">Status</th>
 								</tr>
@@ -373,6 +508,23 @@
 											</div>
 											{#if guest.email}
 												<div class="guest-email">{guest.email}</div>
+											{/if}
+										</td>
+										<td class="col-payment">
+											{#if isPaid(guest.proofOfPayment)}
+												<button
+													class="payment-badge paid clickable"
+													onclick={() => openPaymentModal(guest)}
+													aria-label="View Receipt">Paid</button
+												>
+											{:else}
+												<button
+													class="payment-badge not-paid clickable"
+													onclick={() => openMarkPaidModal(guest)}
+													aria-label="Mark as paid (opens modal)"
+												>
+													Not Paid
+												</button>
 											{/if}
 										</td>
 										<td class="col-time">
@@ -434,6 +586,99 @@
 		</div>
 	</div>
 </div>
+
+{#if showPaymentModal}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="modal-backdrop" onclick={closePaymentModal}>
+		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
+			<div class="modal-header">
+				<h3>Proof of Payment</h3>
+				<button class="close-btn" onclick={closePaymentModal} aria-label="Close modal">✕</button>
+			</div>
+			<div class="modal-body">
+				{#if paymentModalNote}
+					<div class="payment-modal-note">
+						<p class="payment-note-label">Payment recorded</p>
+						<p class="payment-note-value">{paymentModalNote}</p>
+						<p class="payment-note-hint">No receipt or link was uploaded for this payment.</p>
+					</div>
+				{:else}
+					{#each selectedPaymentFileIds as fileId, i}
+						<div class="payment-preview-wrapper">
+							<span class="payment-preview-label">
+								{selectedPaymentFileIds.length > 1 ? `Receipt ${i + 1}` : 'Receipt'}
+							</span>
+							<iframe
+								src="/api/drive-preview?id={encodeURIComponent(fileId)}"
+								title="Receipt {i + 1}"
+								class="payment-preview-iframe"
+							></iframe>
+							<a
+								href={selectedPaymentOriginals[i]}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="payment-open-link"
+							>
+								Open in Google Drive ↗
+							</a>
+						</div>
+					{/each}
+				{/if}
+
+				{#if guestForPayment}
+					<div class="payment-modal-actions">
+						<button
+							class="mark-not-paid-btn"
+							disabled={revokingCertId === guestForPayment.certId}
+							onclick={() => markAsNotPaid(guestForPayment!)}
+							aria-label="Mark as Not Paid"
+						>
+							{#if revokingCertId === guestForPayment.certId}
+								<span class="btn-spinner"></span>
+							{/if}
+							Mark as Not Paid
+						</button>
+					</div>
+				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
+
+{#if showMarkPaidModal && guestForMarkPaid}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="modal-backdrop" onclick={closeMarkPaidModal}>
+		<div class="modal-content mark-paid-modal" onclick={(e) => e.stopPropagation()}>
+			<div class="modal-header">
+				<h3>Mark as Paid</h3>
+				<button class="close-btn" onclick={closeMarkPaidModal} aria-label="Close modal">✕</button>
+			</div>
+			<div class="modal-body mark-paid-modal-body">
+				<p class="mark-paid-guest-name">{guestForMarkPaid.name}</p>
+				{#if guestForMarkPaid.email}
+					<p class="mark-paid-guest-email">{guestForMarkPaid.email}</p>
+				{/if}
+				<p class="mark-paid-hint">Record cash payment received on-site for this attendee.</p>
+				<div class="mark-paid-actions">
+					<button
+						class="mark-paid-submit-btn"
+						disabled={!guestForMarkPaid.certId || approvingCertId === guestForMarkPaid.certId}
+						onclick={() => markAsPaidCash(guestForMarkPaid!)}
+						aria-label="Mark as paid"
+					>
+						{#if approvingCertId === guestForMarkPaid.certId}
+							<span class="btn-spinner"></span>
+						{/if}
+						Mark as Paid
+					</button>
+					<button class="mark-paid-cancel-btn" onclick={closeMarkPaidModal}> Cancel </button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.page-layout {
@@ -911,9 +1156,185 @@
 		text-align: center;
 	}
 
-	.guest-table th.col-time,
-	.guest-table th.col-status {
+	.col-payment {
 		text-align: center;
+	}
+
+	.guest-table th.col-time,
+	.guest-table th.col-status,
+	.guest-table th.col-payment {
+		text-align: center;
+	}
+
+	.payment-badge {
+		display: inline-block;
+		padding: 6px 12px;
+		border-radius: 8px;
+		font-size: 12px;
+		font-weight: 600;
+	}
+
+	.payment-badge.paid {
+		background: rgba(34, 197, 94, 0.1);
+		color: #16a34a;
+	}
+
+	.payment-badge.clickable {
+		cursor: pointer;
+		border: none;
+		font-family: inherit;
+		transition:
+			opacity 0.2s,
+			transform 0.1s;
+	}
+
+	.payment-badge.clickable:hover {
+		opacity: 0.8;
+		background: rgba(34, 197, 94, 0.2);
+	}
+
+	.payment-badge.clickable:active {
+		transform: scale(0.96);
+	}
+
+	.payment-badge.not-paid {
+		background: rgba(239, 68, 68, 0.08);
+		color: #dc2626;
+	}
+
+	.payment-badge.not-paid.clickable {
+		cursor: pointer;
+		border: none;
+		font-family: inherit;
+		transition:
+			opacity 0.2s,
+			background 0.2s;
+	}
+
+	.payment-badge.not-paid.clickable:hover {
+		background: rgba(239, 68, 68, 0.15);
+	}
+
+	.payment-badge.not-paid.clickable:active {
+		opacity: 0.9;
+	}
+
+	/* Mark as Paid modal */
+	.mark-paid-modal {
+		max-width: 400px;
+	}
+
+	.mark-paid-modal-body {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.mark-paid-guest-name {
+		margin: 0;
+		font-size: 18px;
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+
+	.mark-paid-guest-email {
+		margin: 0;
+		font-size: 14px;
+		color: var(--text-secondary);
+		word-break: break-all;
+	}
+
+	.mark-paid-hint {
+		margin: 8px 0 0 0;
+		font-size: 14px;
+		color: var(--text-secondary);
+		line-height: 1.5;
+	}
+
+	.mark-paid-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px;
+		align-items: center;
+		margin-top: 16px;
+	}
+
+	.mark-paid-submit-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 12px 24px;
+		font-size: 15px;
+		font-weight: 600;
+		color: #fff;
+		background: var(--bg-sidebar);
+		border: none;
+		border-radius: 10px;
+		cursor: pointer;
+		font-family: inherit;
+		transition:
+			opacity 0.2s,
+			transform 0.1s;
+	}
+
+	.mark-paid-submit-btn:hover:not(:disabled) {
+		opacity: 0.92;
+	}
+
+	.mark-paid-submit-btn:active:not(:disabled) {
+		transform: scale(0.98);
+	}
+
+	.mark-paid-submit-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.mark-paid-cancel-btn {
+		padding: 12px 20px;
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--text-secondary);
+		background: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 10px;
+		cursor: pointer;
+		font-family: inherit;
+		transition:
+			background 0.2s,
+			border-color 0.2s;
+	}
+
+	.mark-paid-cancel-btn:hover {
+		background: #eee;
+		border-color: #ccc;
+	}
+
+	@media (max-width: 479px) {
+		.mark-paid-modal {
+			margin: 16px;
+			max-height: calc(100vh - 32px);
+		}
+
+		.mark-paid-actions {
+			flex-direction: column;
+			width: 100%;
+		}
+
+		.mark-paid-submit-btn,
+		.mark-paid-cancel-btn {
+			width: 100%;
+		}
+	}
+
+	.btn-spinner {
+		width: 12px;
+		height: 12px;
+		border: 2px solid rgba(128, 0, 0, 0.2);
+		border-top-color: var(--bg-sidebar);
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
 	}
 
 	/* Mobile CSS Card Layout Override (2x2 Grid) */
@@ -944,6 +1365,7 @@
 			grid-template-columns: 1fr auto;
 			grid-template-areas:
 				'name status'
+				'name payment'
 				'name time';
 			gap: 2px 14px;
 			align-items: center;
@@ -995,6 +1417,26 @@
 			font-size: 12px;
 			color: var(--text-secondary);
 			align-self: start;
+		}
+
+		.guest-table td.col-payment {
+			grid-area: payment;
+			padding: 0;
+			text-align: center;
+			align-self: center;
+		}
+
+		.status-badge,
+		.payment-badge {
+			padding: 0 8px;
+			font-size: 11px;
+			width: 76px;
+			height: 26px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			white-space: nowrap;
+			box-sizing: border-box;
 		}
 	}
 
@@ -1154,6 +1596,206 @@
 
 		.time-desktop {
 			display: inline;
+		}
+	}
+
+	/* === Modal CSS === */
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.5);
+		z-index: 1000;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 20px;
+		backdrop-filter: blur(4px);
+		animation: fadeIn 0.2s ease-out forwards;
+	}
+
+	.modal-content {
+		background: #fff;
+		border-radius: 16px;
+		width: 100%;
+		max-width: 500px;
+		max-height: 90vh;
+		display: flex;
+		flex-direction: column;
+		box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+		overflow: hidden;
+		animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	}
+
+	.modal-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 16px 20px;
+		border-bottom: 1px solid var(--border-color);
+		background: #fafafa;
+		flex-shrink: 0;
+	}
+
+	.modal-header h3 {
+		margin: 0;
+		font-size: 16px;
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+
+	.close-btn {
+		background: transparent;
+		border: none;
+		font-size: 18px;
+		color: var(--text-secondary);
+		cursor: pointer;
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: background 0.2s;
+	}
+
+	.close-btn:hover {
+		background: rgba(0, 0, 0, 0.05);
+		color: var(--text-primary);
+	}
+
+	.modal-body {
+		padding: 20px;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	.payment-modal-note {
+		padding: 20px 0;
+		text-align: center;
+	}
+
+	.payment-note-label {
+		margin: 0 0 8px 0;
+		font-size: 12px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		color: var(--text-secondary);
+	}
+
+	.payment-note-value {
+		margin: 0 0 12px 0;
+		font-size: 18px;
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+
+	.payment-note-hint {
+		margin: 0;
+		font-size: 14px;
+		color: var(--text-secondary);
+		line-height: 1.5;
+	}
+
+	.payment-preview-wrapper {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.payment-preview-label {
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+
+	.payment-preview-iframe {
+		width: 100%;
+		height: 60vh;
+		min-height: 320px;
+		border: none;
+		border-radius: 8px;
+		display: block;
+		background: #fafafa;
+	}
+
+	.payment-open-link {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 12px 16px;
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--bg-sidebar);
+		background: rgba(128, 0, 0, 0.05);
+		border-radius: 8px;
+		text-decoration: none;
+		transition: background-color 0.2s ease;
+	}
+
+	.payment-open-link:hover {
+		background-color: rgba(128, 0, 0, 0.1);
+	}
+
+	.payment-modal-actions {
+		display: flex;
+		justify-content: center;
+		padding-top: 8px;
+		border-top: 1px solid var(--border-color);
+		margin-top: 4px;
+	}
+
+	.mark-not-paid-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 10px 20px;
+		font-size: 14px;
+		font-weight: 600;
+		color: #dc2626;
+		background: rgba(239, 68, 68, 0.08);
+		border: 1px solid rgba(239, 68, 68, 0.2);
+		border-radius: 8px;
+		cursor: pointer;
+		font-family: inherit;
+		transition:
+			background 0.2s,
+			color 0.2s;
+	}
+
+	.mark-not-paid-btn:hover:not(:disabled) {
+		background: rgba(239, 68, 68, 0.15);
+	}
+
+	.mark-not-paid-btn:active:not(:disabled) {
+		transform: scale(0.98);
+	}
+
+	.mark-not-paid-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+
+	@keyframes slideUpModal {
+		from {
+			opacity: 0;
+			transform: translateY(20px) scale(0.98);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
 		}
 	}
 </style>

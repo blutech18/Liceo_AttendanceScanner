@@ -11,6 +11,7 @@
 		message: string;
 		time: string;
 		isHistorical?: boolean;
+		proofOfPayment?: string;
 	}
 
 	let html5Qrcode: any = null;
@@ -79,7 +80,8 @@
 				status: 'success' as const,
 				message: '',
 				time: new Date(g.scanTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-				isHistorical: true
+				isHistorical: true,
+				proofOfPayment: g.proofOfPayment || 'NOT PAID'
 			}));
 		} catch (err) {
 			console.error('Failed to load historical scans:', err);
@@ -157,7 +159,8 @@
 						name: data.name || 'Unknown',
 						status: 'success',
 						message: '',
-						time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+						time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+						proofOfPayment: data.proofOfPayment || 'NOT PAID'
 					},
 					...scanLog
 				];
@@ -197,7 +200,8 @@
 							name: nameFromMsg || 'Already Attended',
 							status: 'duplicate',
 							message: 'Already attended',
-							time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+							time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+							proofOfPayment: data.proofOfPayment || 'NOT PAID'
 						},
 						...scanLog
 					];
@@ -463,14 +467,31 @@
 									{/if}
 								</div>
 								<div class="log-details">
-									<div class="log-name">{entry.name}</div>
+									<div class="log-name-row">
+										<div class="log-name">{entry.name}</div>
+										{#if entry.proofOfPayment}
+											<div
+												class="log-payment"
+												class:paid={entry.proofOfPayment !== 'NOT PAID'}
+												class:not-paid={entry.proofOfPayment === 'NOT PAID'}
+											>
+												{entry.proofOfPayment !== 'NOT PAID' ? 'Paid' : 'Not Paid'}
+											</div>
+										{/if}
+									</div>
 									{#if entry.email}
 										<div class="log-email">{entry.email}</div>
-									{:else}
+									{:else if entry.message && entry.status !== 'duplicate'}
 										<div class="log-message">{entry.message}</div>
 									{/if}
 								</div>
-								<div class="log-time">{entry.time}</div>
+								<div class="log-time" class:duplicate-time={entry.status === 'duplicate'}>
+									{#if entry.status === 'duplicate'}
+										Already attended
+									{:else}
+										{entry.time}
+									{/if}
+								</div>
 							</div>
 						{/each}
 					{/if}
@@ -1242,6 +1263,12 @@
 		min-width: 0;
 	}
 
+	.log-name-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
 	.log-name {
 		font-size: 13px;
 		font-weight: 600;
@@ -1261,9 +1288,34 @@
 		text-overflow: ellipsis;
 	}
 
+	.log-payment {
+		font-size: 10px;
+		font-weight: 600;
+		padding: 2px 6px;
+		border-radius: 6px;
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+
+	.log-payment.paid {
+		background: rgba(34, 197, 94, 0.1);
+		color: #16a34a;
+	}
+
+	.log-payment.not-paid {
+		background: rgba(239, 68, 68, 0.08);
+		color: #dc2626;
+	}
+
 	.log-time {
 		font-size: 11px;
 		color: var(--text-muted);
 		flex-shrink: 0;
+	}
+
+	.log-time.duplicate-time {
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--text-muted);
 	}
 </style>
