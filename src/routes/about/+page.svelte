@@ -251,7 +251,7 @@
 	.dev-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 16px;
+		gap: 48px 16px; /* Increased vertical gap to prevent row overlap */
 		margin-top: 32px; /* Add space so images don't overlap the header */
 	}
 
@@ -438,7 +438,7 @@
 		/* 4-col single row — collapses grid height dramatically */
 		.dev-grid {
 			grid-template-columns: repeat(4, 1fr);
-			gap: 10px;
+			gap: 32px 10px; /* Increased vertical gap for mobile */
 			margin-top: 24px;
 		}
 
