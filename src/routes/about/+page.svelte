@@ -3,11 +3,11 @@
 	import Footer from '$lib/components/Footer.svelte';
 
 	const developers = [
-		{ name: 'Dr. Marco Marvin Rado', role: 'Developer', initials: 'MR' },
-		{ name: 'Harley Busa', role: 'Developer', initials: 'HB' },
-		{ name: 'Marsh Ivan Quintila', role: 'Developer', initials: 'MQ' },
-		{ name: 'Cristan Jade Jumawan', role: 'Developer', initials: 'CJ' }
-	];
+		{ name: 'Dr. Marco Marvin L. Rado', role: 'Developer', initials: 'MR', image: '/devs/dev-rado.png' },
+		{ name: 'Harley Busa', role: 'Developer', initials: 'HB', image: '/devs/dev-busa.png' },
+		{ name: 'Marsh Ivan H. Quintila', role: 'Developer', initials: 'MQ', image: '/devs/dev-quintila.png' },
+		{ name: 'Cristan Jade Jumawan', role: 'Developer', initials: 'CJ', image: '/devs/dev-jumawan.png' }
+	]
 </script>
 
 <svelte:head>
@@ -33,6 +33,15 @@
 					> at Liceo de Cagayan University. It allows event organizers to quickly check in pre-registered
 					guests using seamless QR code scanning.
 				</p>
+
+				<div class="tech-stack">
+					<h3 class="tech-title">Powered By</h3>
+					<div class="tech-badges">
+						<span class="badge svelte">SvelteKit</span>
+						<span class="badge ts">TypeScript</span>
+						<span class="badge apps-script">Google Apps Script</span>
+					</div>
+				</div>
 			</div>
 
 			<!-- ── DIVIDER ── -->
@@ -47,7 +56,18 @@
 				<div class="dev-grid">
 					{#each developers as dev, i}
 						<div class="dev-card" style="animation-delay: {i * 70}ms">
-							<div class="dev-initials">{dev.initials}</div>
+							{#if dev.image}
+								<img
+									src={dev.image}
+									alt={dev.name}
+									class="dev-photo"
+									onload={(e) => e.currentTarget.closest('.dev-card')?.classList.add('photo-loaded')}
+									onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; e.currentTarget.closest('.dev-card')?.classList.add('show-initials'); }}
+								/>
+								<div class="dev-initials fallback-initials">{dev.initials}</div>
+							{:else}
+								<div class="dev-initials">{dev.initials}</div>
+							{/if}
 							<div class="dev-info-overlay">
 								<div class="dev-name">{dev.name}</div>
 							</div>
@@ -63,8 +83,8 @@
 <style>
 	.content {
 		flex: 1;
-		overflow-y: auto;
-		overflow-x: hidden;
+		min-height: 0;
+		overflow: hidden;
 		display: flex;
 		flex-direction: column;
 		background: var(--bg-primary);
@@ -72,9 +92,10 @@
 
 	.page-wrapper {
 		flex: 1;
+		min-height: 0;
 		display: flex;
-		align-items: center;
-		padding: 40px 32px;
+		align-items: safe center;
+		padding: 32px 32px;
 		max-width: 1200px;
 		width: 100%;
 		margin: 0 auto;
@@ -97,6 +118,7 @@
 		text-align: center;
 		gap: 20px;
 		padding-right: 48px;
+		min-height: 0;
 	}
 
 	.logo-wrap {
@@ -114,9 +136,12 @@
 	}
 
 	.sys-name {
-		font-size: clamp(20px, 2.5vw, 28px);
+		font-size: clamp(20px, 2.8vw, 32px);
 		font-weight: 800;
-		color: var(--text-primary, #111827);
+		background: linear-gradient(135deg, #800000 0%, #d91b1b 100%);
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
 		margin: 0;
 		line-height: 1.2;
 		letter-spacing: -0.02em;
@@ -129,6 +154,59 @@
 		color: var(--text-secondary, #4b5563);
 		margin: 0;
 		max-width: 420px;
+	}
+
+	/* ── Tech Stack ── */
+	.tech-stack {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12px;
+		margin-top: 16px;
+	}
+
+	.tech-title {
+		font-size: 13px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--text-secondary, #6b7280);
+		margin: 0;
+	}
+
+	.tech-badges {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 8px;
+	}
+
+	.badge {
+		font-size: 12px;
+		font-weight: 600;
+		padding: 4px 12px;
+		border-radius: 100px;
+		background: rgba(128, 0, 0, 0.05);
+		color: #800000;
+		border: 1px solid rgba(128, 0, 0, 0.1);
+	}
+
+	.badge.svelte {
+		background: rgba(255, 62, 0, 0.1);
+		color: #ff3e00;
+		border-color: rgba(255, 62, 0, 0.2);
+	}
+
+	.badge.ts {
+		background: rgba(49, 120, 198, 0.1);
+		color: #3178c6;
+		border-color: rgba(49, 120, 198, 0.2);
+	}
+
+	.badge.apps-script {
+		background: rgba(15, 157, 88, 0.1);
+		color: #0f9d58;
+		border-color: rgba(15, 157, 88, 0.2);
 	}
 
 	/* ── Divider ── */
@@ -151,6 +229,7 @@
 		flex-direction: column;
 		gap: 24px;
 		padding-left: 48px;
+		min-height: 0;
 	}
 
 	.team-header {
@@ -173,28 +252,29 @@
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: 16px;
+		margin-top: 32px; /* Add space so images don't overlap the header */
 	}
 
-	/* ── Dev Cards (Simple Profiles) ── */
+	/* ── Dev Cards (Premium Profiles) ── */
 	.dev-card {
 		display: flex;
 		flex-direction: column;
-		aspect-ratio: 1 / 1;
-		background: linear-gradient(135deg, #800000 0%, #a41010 100%);
-		border-radius: 20px;
-		color: white;
-		box-shadow: 0 6px 16px rgba(128, 0, 0, 0.15);
-		transition:
-			transform 0.2s ease,
-			box-shadow 0.2s ease;
-		animation: fadeUp 0.4s ease both;
-		overflow: hidden;
+		justify-content: flex-end;
+		/* Taller to accommodate the standing photos + name tag below */
+		height: clamp(160px, 22vh, 220px);
+		/* Transparent background so it blends with the page */
+		background: transparent;
+		border-radius: 0;
+		color: var(--text-primary);
+		box-shadow: none;
+		border: none;
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 		position: relative;
+		animation: fadeUp 0.4s ease both;
 	}
 
 	.dev-card:hover {
-		transform: translateY(-4px);
-		box-shadow: 0 12px 28px rgba(128, 0, 0, 0.25);
+		transform: translateY(-6px);
 	}
 
 	@keyframes fadeUp {
@@ -209,29 +289,80 @@
 	}
 
 	.dev-initials {
-		flex: 1;
+		position: absolute;
+		inset: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		font-size: 42px;
 		font-weight: 800;
+		color: rgba(128, 0, 0, 0.15);
 		letter-spacing: -0.02em;
-		text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+		z-index: 0;
 	}
 
+	/* Photo sits above the name tag area */
+	.dev-photo {
+		position: absolute;
+		bottom: 36px; /* Space for the solid part of the name tag */
+		left: 50%;
+		transform: translateX(-50%);
+		width: 140%; /* Extended by 20% from 120% */
+		height: calc(120% - 36px); /* Extended height by 20% */
+		object-fit: contain;
+		object-position: bottom center;
+		z-index: 1;
+		transition: transform 0.4s ease;
+		/* Optional: add a subtle drop shadow to the person to make them pop */
+		filter: drop-shadow(0 8px 16px rgba(0,0,0,0.15));
+	}
+
+	.dev-card:hover .dev-photo {
+		transform: translateX(-50%) scale(1.05);
+	}
+
+	/* Hide fallback initials by default when an image is provided */
+	.fallback-initials {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		opacity: 0;
+		visibility: hidden;
+	}
+
+	/* Show initials only when image errors */
+	:global(.dev-card.show-initials) .dev-photo {
+		display: none;
+	}
+
+	:global(.dev-card.show-initials) .fallback-initials {
+		opacity: 1;
+		visibility: visible;
+	}
+
+	/* Name tag positioned at the bottom, fading up into the image */
 	.dev-info-overlay {
-		width: 100%;
-		padding: 14px 12px;
-		background: rgba(0, 0, 0, 0.25);
-		backdrop-filter: blur(8px);
-		-webkit-backdrop-filter: blur(8px);
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		z-index: 2;
+		height: 66px; /* 30px fade overlap + 36px solid bottom */
+		/* Seamless fade into solid color */
+		background: linear-gradient(to bottom, rgba(128, 0, 0, 0) 0%, rgba(128, 0, 0, 0.95) 30px, rgba(128, 0, 0, 0.95) 100%);
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-end;
+		align-items: center;
+		padding: 0 12px 10px;
 		text-align: center;
+		border-radius: 0 0 8px 8px;
 	}
 
 	.dev-name {
 		font-size: 14px;
 		font-weight: 700;
-		color: white;
+		color: #ffffff;
 		margin-bottom: 2px;
 		white-space: nowrap;
 		overflow: hidden;
@@ -239,10 +370,25 @@
 	}
 
 	/* ── Responsive ── */
-	@media (max-width: 1024px) {
+
+	/* Tablet: keep two-col, just tighten up padding */
+	@media (max-width: 1024px) and (min-width: 769px) {
+		.page-wrapper {
+			padding: 24px 24px;
+		}
+		.col-left {
+			padding-right: 32px;
+		}
+		.col-right {
+			padding-left: 32px;
+		}
+	}
+
+	/* Stack below 768px */
+	@media (max-width: 768px) {
 		.two-col {
 			grid-template-columns: 1fr;
-			gap: 40px;
+			gap: 20px;
 		}
 
 		.col-divider {
@@ -259,38 +405,119 @@
 			margin: 0;
 		}
 
-		.col-left,
+		.col-left {
+			padding: 0;
+			gap: 12px;
+		}
+
 		.col-right {
 			padding: 0;
+			gap: 16px;
+		}
+
+		.logo-wrap {
+			width: 88px;
+			height: 88px;
 		}
 
 		.sys-name {
 			white-space: normal;
-			font-size: clamp(22px, 5vw, 28px);
+			font-size: clamp(18px, 4.5vw, 24px);
 		}
-	}
 
-	@media (max-width: 640px) {
+		.description {
+			font-size: 14px;
+			line-height: 1.65;
+		}
+
 		.page-wrapper {
-			padding: 24px 16px 40px;
+			padding: 20px 20px 16px;
+			align-items: flex-start;
 		}
 
+		/* 4-col single row — collapses grid height dramatically */
 		.dev-grid {
-			grid-template-columns: repeat(2, 1fr);
-			gap: 12px;
+			grid-template-columns: repeat(4, 1fr);
+			gap: 10px;
+			margin-top: 24px;
 		}
 
-		.sys-name {
-			font-size: 24px;
-			line-height: 1.3;
+		.dev-card {
+			height: 150px;
+			border-radius: 0;
 		}
 
 		.dev-initials {
-			font-size: 32px;
+			font-size: 28px;
+		}
+
+		.dev-photo {
+			bottom: 28px;
+			width: 140%;
+			height: calc(120% - 28px);
+		}
+
+		.dev-info-overlay {
+			height: 48px; /* 20px fade + 28px solid */
+			background: linear-gradient(to bottom, rgba(128, 0, 0, 0) 0%, rgba(128, 0, 0, 0.95) 20px, rgba(128, 0, 0, 0.95) 100%);
+			padding: 0 4px 8px;
 		}
 
 		.dev-name {
+			font-size: 11px;
+		}
+
+		.team-title {
+			font-size: 22px;
+		}
+	}
+
+	/* Very small phones (≤ 480px) */
+	@media (max-width: 480px) {
+		.page-wrapper {
+			padding: 16px 14px 12px;
+		}
+
+		.logo-wrap {
+			width: 72px;
+			height: 72px;
+		}
+
+		.sys-name {
+			font-size: 17px;
+		}
+
+		.description {
 			font-size: 13px;
+			line-height: 1.55;
+		}
+
+		.dev-card {
+			height: 130px;
+		}
+
+		.dev-initials {
+			font-size: 22px;
+		}
+
+		.dev-photo {
+			bottom: 24px;
+			width: 140%;
+			height: calc(120% - 24px);
+		}
+
+		.dev-info-overlay {
+			height: 40px; /* 16px fade + 24px solid */
+			background: linear-gradient(to bottom, rgba(128, 0, 0, 0) 0%, rgba(128, 0, 0, 0.95) 16px, rgba(128, 0, 0, 0.95) 100%);
+			padding: 0 4px 6px;
+		}
+
+		.dev-name {
+			font-size: 10px;
+		}
+
+		.team-title {
+			font-size: 19px;
 		}
 	}
 </style>

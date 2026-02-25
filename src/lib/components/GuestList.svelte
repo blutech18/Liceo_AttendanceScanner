@@ -17,7 +17,7 @@
 	let refreshing = $state(false);
 	let filter = $state('all');
 	let typeFilter = $state('all');
-	let sort = $state('default');
+	let sort = $state('newest');
 	let pageSize = $state(25);
 	let search = $state('');
 	let searchFocused = $state(false);
@@ -47,6 +47,37 @@
 	function closeMarkPaidModal() {
 		showMarkPaidModal = false;
 		guestForMarkPaid = null;
+	}
+
+	// Generic confirmation dialog
+	let showConfirmDialog = $state(false);
+	let confirmDialogTitle = $state('');
+	let confirmDialogMessage = $state('');
+	let confirmDialogBtnLabel = $state('');
+	let confirmDialogVariant = $state<'danger' | 'success'>('danger');
+	let confirmDialogPending = $state(false);
+	let confirmDialogOnConfirm = $state<(() => void | Promise<void>) | null>(null);
+
+	function openConfirmDialog(opts: {
+		title: string;
+		message: string;
+		btnLabel: string;
+		variant?: 'danger' | 'success';
+		onConfirm: () => void | Promise<void>;
+	}) {
+		confirmDialogTitle = opts.title;
+		confirmDialogMessage = opts.message;
+		confirmDialogBtnLabel = opts.btnLabel;
+		confirmDialogVariant = opts.variant ?? 'danger';
+		confirmDialogOnConfirm = opts.onConfirm;
+		confirmDialogPending = false;
+		showConfirmDialog = true;
+	}
+
+	function closeConfirmDialog() {
+		showConfirmDialog = false;
+		confirmDialogPending = false;
+		confirmDialogOnConfirm = null;
 	}
 
 	function isPaid(proof: string | null | undefined): boolean {
@@ -165,6 +196,8 @@
 	});
 
 	let filteredGuests = $derived.by(() => {
+		// Capture original registration order as a stable sort fallback
+		const origIdx = new Map<Guest, number>(guests.map((g, i) => [g, i]));
 		let list = [...guests];
 
 		// Type filter
@@ -199,17 +232,25 @@
 		// Sort
 		if (sort === 'newest') {
 			list.sort((a, b) => {
-				if (!a.scanTime && !b.scanTime) return 0;
-				if (!a.scanTime) return 1;
-				if (!b.scanTime) return -1;
-				return new Date(b.scanTime).getTime() - new Date(a.scanTime).getTime();
+				// Both attended: newest scan time first
+				if (a.scanTime && b.scanTime)
+					return new Date(b.scanTime).getTime() - new Date(a.scanTime).getTime();
+				// Attended before unattended
+				if (a.scanTime) return -1;
+				if (b.scanTime) return 1;
+				// Both unattended: newest registration first (reverse original row order)
+				return (origIdx.get(b) ?? 0) - (origIdx.get(a) ?? 0);
 			});
 		} else if (sort === 'oldest') {
 			list.sort((a, b) => {
-				if (!a.scanTime && !b.scanTime) return 0;
-				if (!a.scanTime) return 1;
-				if (!b.scanTime) return -1;
-				return new Date(a.scanTime).getTime() - new Date(b.scanTime).getTime();
+				// Both attended: oldest scan time first
+				if (a.scanTime && b.scanTime)
+					return new Date(a.scanTime).getTime() - new Date(b.scanTime).getTime();
+				// Attended before unattended
+				if (a.scanTime) return -1;
+				if (b.scanTime) return 1;
+				// Both unattended: oldest registration first (original row order)
+				return (origIdx.get(a) ?? 0) - (origIdx.get(b) ?? 0);
 			});
 		} else {
 			// Default: attended first (newest scan on top), then unattended
@@ -418,7 +459,6 @@
 						<option value="notyet">Status: Not Yet</option>
 					</select>
 					<select class="filter-select integrated" bind:value={sort}>
-						<option value="default">Sort: Default</option>
 						<option value="newest">Sort: Newest</option>
 						<option value="oldest">Sort: Oldest</option>
 					</select>
@@ -546,43 +586,40 @@
 				{/if}
 			</div>
 
-			{#if !loading && filteredGuests.length > 0}
-				<div class="pagination">
-					<div class="pagination-left">
-						<span class="rows-label">Rows</span>
-						<select class="rows-select" bind:value={pageSize}>
-							<option value={25}>25</option>
-							<option value={50}>50</option>
-							<option value={100}>100</option>
-						</select>
-					</div>
-					<div class="pagination-center">
-						{#if currentPage > 1}
-							<button class="page-btn" onclick={() => goToPage(1)} aria-label="First page">«</button
-							>
-							<button
-								class="page-btn"
-								onclick={() => goToPage(currentPage - 1)}
-								aria-label="Previous page">‹</button
-							>
-						{/if}
-						<span class="page-info">{currentPage} / {totalPages}</span>
-						{#if currentPage < totalPages}
-							<button
-								class="page-btn"
-								onclick={() => goToPage(currentPage + 1)}
-								aria-label="Next page">›</button
-							>
-							<button class="page-btn" onclick={() => goToPage(totalPages)} aria-label="Last page"
-								>»</button
-							>
-						{/if}
-					</div>
-					<div class="pagination-right">
-						<span class="rows-label">{filteredGuests.length} total</span>
-					</div>
+			<div class="pagination" style:visibility={!loading && filteredGuests.length > 0 ? 'visible' : 'hidden'}>
+				<div class="pagination-left">
+					<span class="rows-label">Rows</span>
+					<select class="rows-select" bind:value={pageSize}>
+						<option value={25}>25</option>
+						<option value={50}>50</option>
+						<option value={100}>100</option>
+					</select>
 				</div>
-			{/if}
+				<div class="pagination-center">
+					{#if currentPage > 1}
+						<button class="page-btn" onclick={() => goToPage(1)} aria-label="First page">«</button>
+						<button
+							class="page-btn"
+							onclick={() => goToPage(currentPage - 1)}
+							aria-label="Previous page">‹</button
+						>
+					{/if}
+					<span class="page-info">{currentPage} / {totalPages}</span>
+					{#if currentPage < totalPages}
+						<button
+							class="page-btn"
+							onclick={() => goToPage(currentPage + 1)}
+							aria-label="Next page">›</button
+						>
+						<button class="page-btn" onclick={() => goToPage(totalPages)} aria-label="Last page"
+							>»</button
+						>
+					{/if}
+				</div>
+				<div class="pagination-right">
+					<span class="rows-label">{filteredGuests.length} total</span>
+				</div>
+			</div>
 		</div>
 	</div>
 </div>
@@ -591,10 +628,28 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="modal-backdrop" onclick={closePaymentModal}>
-		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
+		<div class="modal-content" class:has-preview={!paymentModalNote && selectedPaymentFileIds.length > 0} onclick={(e) => e.stopPropagation()}>
 			<div class="modal-header">
 				<h3>Proof of Payment</h3>
-				<button class="close-btn" onclick={closePaymentModal} aria-label="Close modal">✕</button>
+				<div class="modal-header-actions">
+					{#if guestForPayment}
+						<button
+							class="mark-not-paid-btn"
+							disabled={revokingCertId === guestForPayment.certId}
+							onclick={() => openConfirmDialog({
+								title: 'Revoke Payment',
+								message: `Remove the payment record for ${guestForPayment?.name}? This cannot be undone.`,
+								btnLabel: 'Yes, revoke',
+								variant: 'danger',
+								onConfirm: () => markAsNotPaid(guestForPayment!)
+							})}
+							aria-label="Mark as Not Paid"
+						>
+							Mark as Not Paid
+						</button>
+					{/if}
+					<button class="close-btn" onclick={closePaymentModal} aria-label="Close modal">✕</button>
+				</div>
 			</div>
 			<div class="modal-body">
 				{#if paymentModalNote}
@@ -609,11 +664,11 @@
 							<span class="payment-preview-label">
 								{selectedPaymentFileIds.length > 1 ? `Receipt ${i + 1}` : 'Receipt'}
 							</span>
-							<iframe
+							<img
 								src="/api/drive-preview?id={encodeURIComponent(fileId)}"
-								title="Receipt {i + 1}"
-								class="payment-preview-iframe"
-							></iframe>
+								alt="Receipt {i + 1}"
+								class="payment-preview-img"
+							/>
 							<a
 								href={selectedPaymentOriginals[i]}
 								target="_blank"
@@ -625,22 +680,51 @@
 						</div>
 					{/each}
 				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
 
-				{#if guestForPayment}
-					<div class="payment-modal-actions">
-						<button
-							class="mark-not-paid-btn"
-							disabled={revokingCertId === guestForPayment.certId}
-							onclick={() => markAsNotPaid(guestForPayment!)}
-							aria-label="Mark as Not Paid"
-						>
-							{#if revokingCertId === guestForPayment.certId}
-								<span class="btn-spinner"></span>
-							{/if}
-							Mark as Not Paid
-						</button>
-					</div>
+{#if showConfirmDialog}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="modal-backdrop confirm-dialog-backdrop" onclick={closeConfirmDialog}>
+		<div class="confirm-dialog" onclick={(e) => e.stopPropagation()}>
+			<div class="confirm-dialog-icon" class:danger={confirmDialogVariant === 'danger'} class:success={confirmDialogVariant === 'success'}>
+				{#if confirmDialogVariant === 'danger'}
+					<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+						<line x1="12" y1="9" x2="12" y2="13"/>
+						<line x1="12" y1="17" x2="12.01" y2="17"/>
+					</svg>
+				{:else}
+					<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<circle cx="12" cy="12" r="10"/>
+						<line x1="12" y1="8" x2="12" y2="12"/>
+						<line x1="12" y1="16" x2="12.01" y2="16"/>
+					</svg>
 				{/if}
+			</div>
+			<h3 class="confirm-dialog-title">{confirmDialogTitle}</h3>
+			<p class="confirm-dialog-message">{confirmDialogMessage}</p>
+			<div class="confirm-dialog-actions">
+				<button class="confirm-dialog-cancel" onclick={closeConfirmDialog}>Cancel</button>
+				<button
+					class="confirm-dialog-confirm"
+					class:danger={confirmDialogVariant === 'danger'}
+					class:success={confirmDialogVariant === 'success'}
+					disabled={confirmDialogPending}
+					onclick={async () => {
+						if (confirmDialogOnConfirm) {
+							confirmDialogPending = true;
+							await confirmDialogOnConfirm();
+							closeConfirmDialog();
+						}
+					}}
+				>
+					{#if confirmDialogPending}<span class="btn-spinner"></span>{/if}
+					{confirmDialogBtnLabel}
+				</button>
 			</div>
 		</div>
 	</div>
@@ -665,15 +749,18 @@
 					<button
 						class="mark-paid-submit-btn"
 						disabled={!guestForMarkPaid.certId || approvingCertId === guestForMarkPaid.certId}
-						onclick={() => markAsPaidCash(guestForMarkPaid!)}
+						onclick={() => openConfirmDialog({
+							title: 'Mark as Paid',
+							message: `Confirm recording a cash payment for ${guestForMarkPaid?.name}?`,
+							btnLabel: 'Yes, mark as paid',
+							variant: 'success',
+							onConfirm: () => markAsPaidCash(guestForMarkPaid!)
+						})}
 						aria-label="Mark as paid"
 					>
-						{#if approvingCertId === guestForMarkPaid.certId}
-							<span class="btn-spinner"></span>
-						{/if}
 						Mark as Paid
 					</button>
-					<button class="mark-paid-cancel-btn" onclick={closeMarkPaidModal}> Cancel </button>
+					<button class="mark-paid-cancel-btn" onclick={closeMarkPaidModal}>Cancel</button>
 				</div>
 			</div>
 		</div>
@@ -1577,12 +1664,19 @@
 		.filters-inline {
 			flex-direction: row;
 			width: auto;
-			flex: 1;
+			flex: 0 0 auto;
+			flex-shrink: 0;
 			align-items: center; /* keep refresh inline */
 		}
 
+		.filter-select.integrated {
+			flex: 0 0 auto;
+			min-width: max-content;
+		}
+
 		.search-container {
-			flex: 0 0 60%;
+			flex: 1 1 0;
+			min-width: 180px;
 			max-width: none;
 		}
 
@@ -1608,7 +1702,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: 20px;
+		padding: 12px;
 		backdrop-filter: blur(4px);
 		animation: fadeIn 0.2s ease-out forwards;
 	}
@@ -1618,12 +1712,16 @@
 		border-radius: 16px;
 		width: 100%;
 		max-width: 500px;
-		max-height: 90vh;
+		max-height: calc(100dvh - 24px);
 		display: flex;
 		flex-direction: column;
 		box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
 		overflow: hidden;
 		animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	}
+
+	.modal-content.has-preview {
+		height: calc(100dvh - 24px);
 	}
 
 	.modal-header {
@@ -1633,6 +1731,14 @@
 		padding: 16px 20px;
 		border-bottom: 1px solid var(--border-color);
 		background: #fafafa;
+		flex-shrink: 0;
+		gap: 12px;
+	}
+
+	.modal-header-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
 		flex-shrink: 0;
 	}
 
@@ -1664,11 +1770,13 @@
 	}
 
 	.modal-body {
-		padding: 20px;
-		overflow-y: auto;
+		padding: 16px 20px;
+		overflow: hidden;
 		display: flex;
 		flex-direction: column;
-		gap: 16px;
+		gap: 12px;
+		flex: 1;
+		min-height: 0;
 	}
 
 	.payment-modal-note {
@@ -1702,23 +1810,27 @@
 	.payment-preview-wrapper {
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
+		gap: 10px;
+		flex: 1;
+		min-height: 0;
 	}
 
 	.payment-preview-label {
 		font-size: 14px;
 		font-weight: 600;
 		color: var(--text-primary);
+		flex-shrink: 0;
 	}
 
-	.payment-preview-iframe {
+	.payment-preview-img {
+		flex: 1;
+		min-height: 0;
 		width: 100%;
-		height: 60vh;
-		min-height: 320px;
-		border: none;
+		object-fit: contain;
 		border-radius: 8px;
-		display: block;
 		background: #fafafa;
+		display: block;
+		align-self: stretch;
 	}
 
 	.payment-open-link {
@@ -1733,6 +1845,7 @@
 		border-radius: 8px;
 		text-decoration: none;
 		transition: background-color 0.2s ease;
+		flex-shrink: 0;
 	}
 
 	.payment-open-link:hover {
@@ -1740,20 +1853,16 @@
 	}
 
 	.payment-modal-actions {
-		display: flex;
-		justify-content: center;
-		padding-top: 8px;
-		border-top: 1px solid var(--border-color);
-		margin-top: 4px;
+		display: none;
 	}
 
 	.mark-not-paid-btn {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		gap: 8px;
-		padding: 10px 20px;
-		font-size: 14px;
+		gap: 6px;
+		padding: 6px 14px;
+		font-size: 13px;
 		font-weight: 600;
 		color: #dc2626;
 		background: rgba(239, 68, 68, 0.08);
@@ -1779,6 +1888,124 @@
 		cursor: not-allowed;
 	}
 
+	/* Confirmation dialog */
+	.confirm-dialog-backdrop {
+		z-index: 1100;
+	}
+
+	.confirm-dialog {
+		background: #fff;
+		border-radius: 16px;
+		width: 100%;
+		max-width: 360px;
+		padding: 28px 24px 24px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		gap: 12px;
+		box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+		animation: slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	}
+
+	.confirm-dialog-icon {
+		width: 56px;
+		height: 56px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 4px;
+	}
+
+	.confirm-dialog-icon.danger {
+		background: rgba(239, 68, 68, 0.1);
+		color: #dc2626;
+	}
+
+	.confirm-dialog-icon.success {
+		background: rgba(22, 163, 74, 0.1);
+		color: #16a34a;
+	}
+
+	.confirm-dialog-title {
+		margin: 0;
+		font-size: 17px;
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+
+	.confirm-dialog-message {
+		margin: 0;
+		font-size: 14px;
+		color: var(--text-secondary);
+		line-height: 1.55;
+	}
+
+	.confirm-dialog-actions {
+		display: flex;
+		gap: 10px;
+		width: 100%;
+		margin-top: 8px;
+	}
+
+	.confirm-dialog-cancel {
+		flex: 1;
+		padding: 10px 16px;
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--text-secondary);
+		background: #f3f4f6;
+		border: 1px solid var(--border-color);
+		border-radius: 10px;
+		cursor: pointer;
+		font-family: inherit;
+		transition: background 0.2s;
+	}
+
+	.confirm-dialog-cancel:hover {
+		background: #e5e7eb;
+	}
+
+	.confirm-dialog-confirm {
+		flex: 1;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		padding: 10px 16px;
+		font-size: 14px;
+		font-weight: 600;
+		border: none;
+		border-radius: 10px;
+		cursor: pointer;
+		font-family: inherit;
+		transition: background 0.2s, opacity 0.2s;
+	}
+
+	.confirm-dialog-confirm.danger {
+		color: #fff;
+		background: #dc2626;
+	}
+
+	.confirm-dialog-confirm.danger:hover:not(:disabled) {
+		background: #b91c1c;
+	}
+
+	.confirm-dialog-confirm.success {
+		color: #fff;
+		background: #16a34a;
+	}
+
+	.confirm-dialog-confirm.success:hover:not(:disabled) {
+		background: #15803d;
+	}
+
+	.confirm-dialog-confirm:disabled {
+		opacity: 0.65;
+		cursor: not-allowed;
+	}
+
 	@keyframes fadeIn {
 		from {
 			opacity: 0;
@@ -1796,6 +2023,30 @@
 		to {
 			opacity: 1;
 			transform: translateY(0) scale(1);
+		}
+	}
+
+	@media (min-width: 480px) {
+		.modal-backdrop {
+			padding: 20px;
+		}
+
+		.modal-content {
+			max-height: calc(100dvh - 40px);
+		}
+
+		.modal-content.has-preview {
+			height: calc(100dvh - 40px);
+		}
+	}
+
+	@media (min-width: 768px) {
+		.modal-content {
+			max-height: 90dvh;
+		}
+
+		.modal-content.has-preview {
+			height: 90dvh;
 		}
 	}
 </style>
