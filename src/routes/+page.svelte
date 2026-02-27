@@ -1355,7 +1355,7 @@
 	}
 
 	.log-details {
-		flex: 1;
+		flex: 1 1 0;
 		min-width: 0;
 	}
 
@@ -1364,7 +1364,7 @@
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
-		width: 72px;
+		width: clamp(72px, 13%, 96px);
 	}
 
 	.log-name {
@@ -1560,9 +1560,11 @@
 	}
 
 	.log-time {
+		flex: 1 1 0;
+		min-width: 0;
 		font-size: 11px;
 		color: var(--text-muted);
-		flex-shrink: 0;
+		text-align: right;
 	}
 
 	.log-time.duplicate-time {
