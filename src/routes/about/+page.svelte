@@ -84,7 +84,8 @@
 	.content {
 		flex: 1;
 		min-height: 0;
-		overflow: hidden;
+		overflow-y: auto;
+		overflow-x: hidden;
 		display: flex;
 		flex-direction: column;
 		background: var(--bg-primary);
@@ -99,6 +100,7 @@
 		max-width: 1200px;
 		width: 100%;
 		margin: 0 auto;
+		box-sizing: border-box;
 	}
 
 	/* ── Two-column grid ── */
@@ -108,6 +110,7 @@
 		gap: 0;
 		width: 100%;
 		align-items: center;
+		min-width: 0;
 	}
 
 	/* ── Left column ── */
@@ -119,6 +122,7 @@
 		gap: 20px;
 		padding-right: 48px;
 		min-height: 0;
+		min-width: 0;
 	}
 
 	.logo-wrap {
@@ -136,7 +140,7 @@
 	}
 
 	.sys-name {
-		font-size: clamp(20px, 2.8vw, 32px);
+		font-size: clamp(18px, 2.4vw, 32px);
 		font-weight: 800;
 		background: linear-gradient(135deg, #800000 0%, #d91b1b 100%);
 		-webkit-background-clip: text;
@@ -145,7 +149,8 @@
 		margin: 0;
 		line-height: 1.2;
 		letter-spacing: -0.02em;
-		white-space: nowrap;
+		white-space: normal;
+		max-width: 360px;
 	}
 
 	.description {
@@ -230,6 +235,7 @@
 		gap: 24px;
 		padding-left: 48px;
 		min-height: 0;
+		min-width: 0;
 	}
 
 	.team-header {
@@ -371,16 +377,49 @@
 
 	/* ── Responsive ── */
 
-	/* Tablet: keep two-col, just tighten up padding */
-	@media (max-width: 1024px) and (min-width: 769px) {
+	/* Large desktops only — allow nowrap title */
+	@media (min-width: 1400px) {
+		.sys-name {
+			white-space: nowrap;
+			max-width: none;
+		}
+	}
+
+	/* Tablet landscape & portrait: Honor Pad 9 and similar (769px – 1280px) */
+	@media (max-width: 1280px) and (min-width: 769px) {
 		.page-wrapper {
-			padding: 24px 24px;
+			padding: 20px 20px;
 		}
 		.col-left {
-			padding-right: 32px;
+			padding-right: 20px;
+			gap: 14px;
 		}
 		.col-right {
-			padding-left: 32px;
+			padding-left: 20px;
+			gap: 16px;
+		}
+		.logo-wrap {
+			width: 88px;
+			height: 88px;
+		}
+		.sys-name {
+			font-size: clamp(16px, 2vw, 24px);
+			white-space: normal;
+			max-width: 280px;
+		}
+		.description {
+			font-size: 13px;
+			line-height: 1.65;
+		}
+		.dev-grid {
+			gap: 40px 12px;
+			margin-top: 24px;
+		}
+		.dev-card {
+			height: clamp(140px, 18vh, 200px);
+		}
+		.team-title {
+			font-size: 22px;
 		}
 	}
 
