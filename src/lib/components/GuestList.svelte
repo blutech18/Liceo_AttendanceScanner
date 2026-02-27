@@ -538,7 +538,12 @@
 							</thead>
 							<tbody>
 								{#each pagedGuests as guest, i}
-									<tr>
+									<!-- svelte-ignore a11y_click_events_have_key_events -->
+									<!-- svelte-ignore a11y_no_static_element_interactions -->
+									<tr
+										class="row-clickable"
+										onclick={() => isPaid(guest.proofOfPayment) ? openPaymentModal(guest) : openMarkPaidModal(guest)}
+									>
 										<td class="col-num" data-index="{(currentPage - 1) * pageSize + i + 1}. ">
 											{(currentPage - 1) * pageSize + i + 1}
 										</td>
@@ -552,19 +557,9 @@
 										</td>
 										<td class="col-payment">
 											{#if isPaid(guest.proofOfPayment)}
-												<button
-													class="payment-badge paid clickable"
-													onclick={() => openPaymentModal(guest)}
-													aria-label="View Receipt">Paid</button
-												>
+												<span class="payment-badge paid">Paid</span>
 											{:else}
-												<button
-													class="payment-badge not-paid clickable"
-													onclick={() => openMarkPaidModal(guest)}
-													aria-label="Mark as paid (opens modal)"
-												>
-													Not Paid
-												</button>
+												<span class="payment-badge not-paid">Not Paid</span>
 											{/if}
 										</td>
 										<td class="col-time">
@@ -1213,6 +1208,14 @@
 		border-bottom: none;
 	}
 
+	.guest-table tbody tr.row-clickable {
+		cursor: pointer;
+	}
+
+	.guest-table tbody tr.row-clickable:hover td {
+		background: rgba(0, 0, 0, 0.025);
+	}
+
 	.col-num {
 		width: 48px;
 		text-align: center;
@@ -1266,44 +1269,9 @@
 		color: #16a34a;
 	}
 
-	.payment-badge.clickable {
-		cursor: pointer;
-		border: none;
-		font-family: inherit;
-		transition:
-			opacity 0.2s,
-			transform 0.1s;
-	}
-
-	.payment-badge.clickable:hover {
-		opacity: 0.8;
-		background: rgba(34, 197, 94, 0.2);
-	}
-
-	.payment-badge.clickable:active {
-		transform: scale(0.96);
-	}
-
 	.payment-badge.not-paid {
 		background: rgba(239, 68, 68, 0.08);
 		color: #dc2626;
-	}
-
-	.payment-badge.not-paid.clickable {
-		cursor: pointer;
-		border: none;
-		font-family: inherit;
-		transition:
-			opacity 0.2s,
-			background 0.2s;
-	}
-
-	.payment-badge.not-paid.clickable:hover {
-		background: rgba(239, 68, 68, 0.15);
-	}
-
-	.payment-badge.not-paid.clickable:active {
-		opacity: 0.9;
 	}
 
 	/* Mark as Paid modal */

@@ -458,12 +458,16 @@
 						</div>
 					{:else}
 						{#each scanLog as entry, i}
+							<!-- svelte-ignore a11y_click_events_have_key_events -->
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
 								class="log-item"
 								class:success={entry.status === 'success'}
 								class:error={entry.status === 'error'}
 								class:duplicate={entry.status === 'duplicate'}
+								class:row-clickable={isPaid(entry.proofOfPayment)}
 								style="animation-delay: {i * 0.03}s"
+								onclick={() => isPaid(entry.proofOfPayment) && openPaymentModal(entry)}
 							>
 								<div class="log-icon">
 									{#if entry.status === 'success'}
@@ -522,16 +526,9 @@
 								<div class="log-payment-col">
 									{#if entry.proofOfPayment}
 										{#if isPaid(entry.proofOfPayment)}
-											<button
-												class="log-payment paid"
-												onclick={() => openPaymentModal(entry)}
-												type="button"
-												title="View receipt"
-											>
-												Paid ↗
-											</button>
+											<span class="log-payment paid">Paid</span>
 										{:else}
-											<div class="log-payment not-paid">Not Paid</div>
+											<span class="log-payment not-paid">Not Paid</span>
 										{/if}
 									{/if}
 								</div>
@@ -1386,6 +1383,14 @@
 		text-overflow: ellipsis;
 	}
 
+	.log-item.row-clickable {
+		cursor: pointer;
+	}
+
+	.log-item.row-clickable:hover {
+		background: rgba(0, 0, 0, 0.025);
+	}
+
 	.log-payment {
 		font-size: 10px;
 		font-weight: 600;
@@ -1393,20 +1398,11 @@
 		border-radius: 6px;
 		white-space: nowrap;
 		flex-shrink: 0;
-		border: none;
-		font-family: inherit;
-		cursor: default;
 	}
 
 	.log-payment.paid {
 		background: rgba(34, 197, 94, 0.1);
 		color: #16a34a;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.log-payment.paid:hover {
-		background: rgba(34, 197, 94, 0.22);
 	}
 
 	.log-payment.not-paid {
