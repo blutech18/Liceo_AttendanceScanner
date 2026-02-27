@@ -512,27 +512,27 @@
 									{/if}
 								</div>
 								<div class="log-details">
-									<div class="log-name-row">
-										<div class="log-name">{entry.name}</div>
-										{#if entry.proofOfPayment}
-											{#if isPaid(entry.proofOfPayment)}
-												<button
-													class="log-payment paid"
-													onclick={() => openPaymentModal(entry)}
-													type="button"
-													title="View receipt"
-												>
-													Paid ↗
-												</button>
-											{:else}
-												<div class="log-payment not-paid">Not Paid</div>
-											{/if}
-										{/if}
-									</div>
+									<div class="log-name">{entry.name}</div>
 									{#if entry.email}
 										<div class="log-email">{entry.email}</div>
 									{:else if entry.message && entry.status !== 'duplicate'}
 										<div class="log-message">{entry.message}</div>
+									{/if}
+								</div>
+								<div class="log-payment-col">
+									{#if entry.proofOfPayment}
+										{#if isPaid(entry.proofOfPayment)}
+											<button
+												class="log-payment paid"
+												onclick={() => openPaymentModal(entry)}
+												type="button"
+												title="View receipt"
+											>
+												Paid ↗
+											</button>
+										{:else}
+											<div class="log-payment not-paid">Not Paid</div>
+										{/if}
 									{/if}
 								</div>
 								<div class="log-time" class:duplicate-time={entry.status === 'duplicate'}>
@@ -1359,10 +1359,12 @@
 		min-width: 0;
 	}
 
-	.log-name-row {
+	.log-payment-col {
 		display: flex;
 		align-items: center;
-		gap: 6px;
+		justify-content: center;
+		flex-shrink: 0;
+		width: 72px;
 	}
 
 	.log-name {
