@@ -30,6 +30,51 @@
 	let isFullscreen = $state(false);
 	let facingMode = $state<'environment' | 'user'>('environment');
 
+	// Payment Receipt Modal
+	let showPaymentModal = $state(false);
+	let selectedPaymentFileIds = $state<string[]>([]);
+	let selectedPaymentOriginals = $state<string[]>([]);
+	let paymentModalNote = $state<string | null>(null);
+	let paymentModalName = $state<string>('');
+
+	function isPaid(proof: string | null | undefined): boolean {
+		return !!proof && proof !== 'NOT PAID';
+	}
+
+	function openPaymentModal(entry: ScanEntry) {
+		const proof = entry.proofOfPayment;
+		if (!isPaid(proof)) return;
+		paymentModalName = entry.name;
+
+		const rawParts = proof!
+			.split(',')
+			.map((s) => s.trim())
+			.filter(Boolean);
+
+		const urls: string[] = [];
+		const fileIds: string[] = [];
+		for (const part of rawParts) {
+			const match = part.match(/id=([^&]+)/) || part.match(/\/d\/([a-zA-Z0-9_-]+)/);
+			if (match && match[1]) {
+				urls.push(part);
+				fileIds.push(match[1]);
+			}
+		}
+
+		selectedPaymentOriginals = urls;
+		selectedPaymentFileIds = fileIds;
+		paymentModalNote = urls.length === 0 ? proof! : null;
+		showPaymentModal = true;
+	}
+
+	function closePaymentModal() {
+		showPaymentModal = false;
+		selectedPaymentFileIds = [];
+		selectedPaymentOriginals = [];
+		paymentModalNote = null;
+		paymentModalName = '';
+	}
+
 	const RESUME_DELAY_MS = 2000;
 
 	async function switchCamera() {
@@ -470,13 +515,18 @@
 									<div class="log-name-row">
 										<div class="log-name">{entry.name}</div>
 										{#if entry.proofOfPayment}
-											<div
-												class="log-payment"
-												class:paid={entry.proofOfPayment !== 'NOT PAID'}
-												class:not-paid={entry.proofOfPayment === 'NOT PAID'}
-											>
-												{entry.proofOfPayment !== 'NOT PAID' ? 'Paid' : 'Not Paid'}
-											</div>
+											{#if isPaid(entry.proofOfPayment)}
+												<button
+													class="log-payment paid"
+													onclick={() => openPaymentModal(entry)}
+													type="button"
+													title="View receipt"
+												>
+													Paid ↗
+												</button>
+											{:else}
+												<div class="log-payment not-paid">Not Paid</div>
+											{/if}
 										{/if}
 									</div>
 									{#if entry.email}
@@ -501,6 +551,52 @@
 	</div>
 	<Footer />
 </main>
+
+{#if showPaymentModal}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="modal-backdrop" onclick={closePaymentModal}>
+		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
+			<div class="modal-header">
+				<h3>Proof of Payment</h3>
+				<button class="modal-close-btn" onclick={closePaymentModal} aria-label="Close">✕</button>
+			</div>
+			{#if paymentModalName}
+				<div class="modal-guest-name">{paymentModalName}</div>
+			{/if}
+			<div class="modal-body">
+				{#if paymentModalNote}
+					<div class="payment-modal-note">
+						<p class="payment-note-label">Payment recorded</p>
+						<p class="payment-note-value">{paymentModalNote}</p>
+						<p class="payment-note-hint">No receipt or link was uploaded for this payment.</p>
+					</div>
+				{:else}
+					{#each selectedPaymentFileIds as fileId, i}
+						<div class="payment-preview-wrapper">
+							<span class="payment-preview-label">
+								{selectedPaymentFileIds.length > 1 ? `Receipt ${i + 1}` : 'Receipt'}
+							</span>
+							<img
+								src="/api/drive-preview?id={encodeURIComponent(fileId)}"
+								alt="Receipt {i + 1}"
+								class="payment-preview-img"
+							/>
+							<a
+								href={selectedPaymentOriginals[i]}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="payment-open-link"
+							>
+								Open in Google Drive ↗
+							</a>
+						</div>
+					{/each}
+				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.content {
@@ -1295,16 +1391,170 @@
 		border-radius: 6px;
 		white-space: nowrap;
 		flex-shrink: 0;
+		border: none;
+		font-family: inherit;
+		cursor: default;
 	}
 
 	.log-payment.paid {
 		background: rgba(34, 197, 94, 0.1);
 		color: #16a34a;
+		cursor: pointer;
+		transition: background 0.15s;
+	}
+
+	.log-payment.paid:hover {
+		background: rgba(34, 197, 94, 0.22);
 	}
 
 	.log-payment.not-paid {
 		background: rgba(239, 68, 68, 0.08);
 		color: #dc2626;
+	}
+
+	/* ── Payment Receipt Modal ── */
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.55);
+		z-index: 1000;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 16px;
+	}
+
+	.modal-content {
+		background: #fff;
+		border-radius: 16px;
+		width: 100%;
+		max-width: 480px;
+		max-height: 90vh;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+	}
+
+	.modal-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 16px 20px 12px;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+		flex-shrink: 0;
+	}
+
+	.modal-header h3 {
+		margin: 0;
+		font-size: 16px;
+		font-weight: 700;
+		color: var(--text-primary, #111827);
+	}
+
+	.modal-guest-name {
+		padding: 8px 20px 0;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--text-secondary, #6b7280);
+		flex-shrink: 0;
+	}
+
+	.modal-close-btn {
+		background: none;
+		border: none;
+		font-size: 18px;
+		cursor: pointer;
+		color: var(--text-muted, #9ca3af);
+		padding: 4px 8px;
+		border-radius: 6px;
+		transition: background 0.15s;
+		font-family: inherit;
+	}
+
+	.modal-close-btn:hover {
+		background: rgba(0, 0, 0, 0.06);
+	}
+
+	.modal-body {
+		padding: 16px 20px;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		flex: 1;
+		min-height: 0;
+	}
+
+	.payment-modal-note {
+		padding: 20px 0;
+		text-align: center;
+	}
+
+	.payment-note-label {
+		margin: 0 0 8px;
+		font-size: 12px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		color: var(--text-secondary, #6b7280);
+	}
+
+	.payment-note-value {
+		margin: 0 0 12px;
+		font-size: 18px;
+		font-weight: 700;
+		color: var(--text-primary, #111827);
+	}
+
+	.payment-note-hint {
+		margin: 0;
+		font-size: 14px;
+		color: var(--text-secondary, #6b7280);
+		line-height: 1.5;
+	}
+
+	.payment-preview-wrapper {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		flex: 1;
+		min-height: 0;
+	}
+
+	.payment-preview-label {
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--text-primary, #111827);
+		flex-shrink: 0;
+	}
+
+	.payment-preview-img {
+		width: 100%;
+		object-fit: contain;
+		border-radius: 8px;
+		background: #fafafa;
+		display: block;
+		max-height: 60vh;
+	}
+
+	.payment-open-link {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 12px 16px;
+		font-size: 14px;
+		font-weight: 600;
+		color: #800000;
+		background: rgba(128, 0, 0, 0.05);
+		border-radius: 8px;
+		text-decoration: none;
+		transition: background 0.2s;
+		flex-shrink: 0;
+	}
+
+	.payment-open-link:hover {
+		background: rgba(128, 0, 0, 0.1);
 	}
 
 	.log-time {
