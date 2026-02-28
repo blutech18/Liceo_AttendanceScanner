@@ -81,10 +81,11 @@
 			const data = await res.json();
 
 			if (data.success) {
+				const isOut = data.scanType === 'OUT';
 				scannerStatus = 'success';
-				statusText = 'Attendance recorded!';
+				statusText = isOut ? 'Afternoon recorded!' : 'Attendance recorded!';
 				resultTitle = data.name || 'Attendance Recorded';
-				resultMessage = 'Successfully checked in';
+				resultMessage = isOut ? 'Afternoon check-in successful' : 'Successfully checked in';
 
 				if (browser) {
 					const count = parseInt(localStorage.getItem('scanCount') || '0') + 1;
@@ -101,10 +102,14 @@
 				) {
 					resultTitle = 'Not Pre-registered';
 					resultMessage = 'This QR code is not on the guest list';
-				} else if (msg.includes('already') || msg.includes('duplicate')) {
+				} else if (
+					msg.includes('already') ||
+					msg.includes('duplicate') ||
+					msg.includes('fully checked')
+				) {
 					resultTitle = 'Already Checked In';
 					resultMessage = data.name
-						? `${data.name} has already attended`
+						? `${data.name} has already fully checked in`
 						: 'This guest has already been scanned';
 				} else {
 					resultTitle = 'QR Not Recognized';

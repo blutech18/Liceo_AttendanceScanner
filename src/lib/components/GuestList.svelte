@@ -10,6 +10,8 @@
 		scanTime: string | null;
 		attended: boolean;
 		proofOfPayment: string;
+		statusOut: string;
+		scanTimeOut: string | null;
 	}
 
 	let guests = $state<Guest[]>([]);
@@ -318,9 +320,11 @@
 							email: r.email || '',
 							type: (r.type || r.participantType || r.category || '').trim(),
 							certId: r.certId || '',
-							scanTime: match ? match.scanTime || null : null,
-							attended: !!match,
-							proofOfPayment: r.proofOfPayment || 'NOT PAID'
+							scanTime: (match ? match.scanTime || null : null) || r.scanTime || null,
+							attended: !!match || r.status === 'ATTENDED' || r.status === 'IN' || r.status === 'OUT',
+							proofOfPayment: r.proofOfPayment || 'NOT PAID',
+							statusOut: r.statusOut || (match ? match.statusOut || '' : ''),
+							scanTimeOut: match ? match.scanTimeOut || null : null
 						};
 					});
 				} else if (data.attendees) {
@@ -331,7 +335,9 @@
 						certId: a.certId || '',
 						scanTime: a.scanTime || null,
 						attended: true,
-						proofOfPayment: a.proofOfPayment || 'NOT PAID'
+						proofOfPayment: a.proofOfPayment || 'NOT PAID',
+						statusOut: a.statusOut || '',
+						scanTimeOut: a.scanTimeOut || null
 					}));
 				}
 			}
@@ -542,7 +548,10 @@
 									<!-- svelte-ignore a11y_no_static_element_interactions -->
 									<tr
 										class="row-clickable"
-										onclick={() => isPaid(guest.proofOfPayment) ? openPaymentModal(guest) : openMarkPaidModal(guest)}
+										onclick={() =>
+											isPaid(guest.proofOfPayment)
+												? openPaymentModal(guest)
+												: openMarkPaidModal(guest)}
 									>
 										<td class="col-num" data-index="{(currentPage - 1) * pageSize + i + 1}. ">
 											{(currentPage - 1) * pageSize + i + 1}
@@ -567,8 +576,10 @@
 											<span class="time-desktop">{formatTimeDesktop(guest.scanTime)}</span>
 										</td>
 										<td class="col-status">
-											{#if guest.attended}
-												<span class="status-badge attended">Attended</span>
+											{#if guest.attended && guest.statusOut === 'OUT'}
+												<span class="status-badge attended">IN & OUT</span>
+											{:else if guest.attended}
+												<span class="status-badge in-only">IN</span>
 											{:else}
 												<span class="status-badge not-attended">Not Yet</span>
 											{/if}
@@ -581,7 +592,10 @@
 				{/if}
 			</div>
 
-			<div class="pagination" style:visibility={!loading && filteredGuests.length > 0 ? 'visible' : 'hidden'}>
+			<div
+				class="pagination"
+				style:visibility={!loading && filteredGuests.length > 0 ? 'visible' : 'hidden'}
+			>
 				<div class="pagination-left">
 					<span class="rows-label">Rows</span>
 					<select class="rows-select" bind:value={pageSize}>
@@ -623,7 +637,11 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="modal-backdrop" onclick={closePaymentModal}>
-		<div class="modal-content" class:has-preview={!paymentModalNote && selectedPaymentFileIds.length > 0} onclick={(e) => e.stopPropagation()}>
+		<div
+			class="modal-content"
+			class:has-preview={!paymentModalNote && selectedPaymentFileIds.length > 0}
+			onclick={(e) => e.stopPropagation()}
+		>
 			<div class="modal-header">
 				<h3>Proof of Payment</h3>
 				<div class="modal-header-actions">
@@ -631,13 +649,14 @@
 						<button
 							class="mark-not-paid-btn"
 							disabled={revokingCertId === guestForPayment.certId}
-							onclick={() => openConfirmDialog({
-								title: 'Revoke Payment',
-								message: `Remove the payment record for ${guestForPayment?.name}? This cannot be undone.`,
-								btnLabel: 'Yes, revoke',
-								variant: 'danger',
-								onConfirm: () => markAsNotPaid(guestForPayment!)
-							})}
+							onclick={() =>
+								openConfirmDialog({
+									title: 'Revoke Payment',
+									message: `Remove the payment record for ${guestForPayment?.name}? This cannot be undone.`,
+									btnLabel: 'Yes, revoke',
+									variant: 'danger',
+									onConfirm: () => markAsNotPaid(guestForPayment!)
+								})}
 							aria-label="Mark as Not Paid"
 						>
 							Mark as Not Paid
@@ -685,18 +704,42 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="modal-backdrop confirm-dialog-backdrop" onclick={closeConfirmDialog}>
 		<div class="confirm-dialog" onclick={(e) => e.stopPropagation()}>
-			<div class="confirm-dialog-icon" class:danger={confirmDialogVariant === 'danger'} class:success={confirmDialogVariant === 'success'}>
+			<div
+				class="confirm-dialog-icon"
+				class:danger={confirmDialogVariant === 'danger'}
+				class:success={confirmDialogVariant === 'success'}
+			>
 				{#if confirmDialogVariant === 'danger'}
-					<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-						<line x1="12" y1="9" x2="12" y2="13"/>
-						<line x1="12" y1="17" x2="12.01" y2="17"/>
+					<svg
+						width="28"
+						height="28"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path
+							d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+						/>
+						<line x1="12" y1="9" x2="12" y2="13" />
+						<line x1="12" y1="17" x2="12.01" y2="17" />
 					</svg>
 				{:else}
-					<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<circle cx="12" cy="12" r="10"/>
-						<line x1="12" y1="8" x2="12" y2="12"/>
-						<line x1="12" y1="16" x2="12.01" y2="16"/>
+					<svg
+						width="28"
+						height="28"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<circle cx="12" cy="12" r="10" />
+						<line x1="12" y1="8" x2="12" y2="12" />
+						<line x1="12" y1="16" x2="12.01" y2="16" />
 					</svg>
 				{/if}
 			</div>
@@ -744,13 +787,14 @@
 					<button
 						class="mark-paid-submit-btn"
 						disabled={!guestForMarkPaid.certId || approvingCertId === guestForMarkPaid.certId}
-						onclick={() => openConfirmDialog({
-							title: 'Mark as Paid',
-							message: `Confirm recording a cash payment for ${guestForMarkPaid?.name}?`,
-							btnLabel: 'Yes, mark as paid',
-							variant: 'success',
-							onConfirm: () => markAsPaidCash(guestForMarkPaid!)
-						})}
+						onclick={() =>
+							openConfirmDialog({
+								title: 'Mark as Paid',
+								message: `Confirm recording a cash payment for ${guestForMarkPaid?.name}?`,
+								btnLabel: 'Yes, mark as paid',
+								variant: 'success',
+								onConfirm: () => markAsPaidCash(guestForMarkPaid!)
+							})}
 						aria-label="Mark as paid"
 					>
 						Mark as Paid
@@ -1525,6 +1569,11 @@
 		color: var(--text-secondary);
 	}
 
+	.status-badge.in-only {
+		background: rgba(245, 158, 11, 0.1);
+		color: #d97706;
+	}
+
 	.loading-state {
 		display: flex;
 		flex-direction: column;
@@ -1948,7 +1997,9 @@
 		border-radius: 10px;
 		cursor: pointer;
 		font-family: inherit;
-		transition: background 0.2s, opacity 0.2s;
+		transition:
+			background 0.2s,
+			opacity 0.2s;
 	}
 
 	.confirm-dialog-confirm.danger {

@@ -12,6 +12,7 @@
 		time: string;
 		isHistorical?: boolean;
 		proofOfPayment?: string;
+		scanType?: 'IN' | 'OUT' | '';
 	}
 
 	let html5Qrcode: any = null;
@@ -126,7 +127,8 @@
 				message: '',
 				time: new Date(g.scanTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
 				isHistorical: true,
-				proofOfPayment: g.proofOfPayment || 'NOT PAID'
+				proofOfPayment: g.proofOfPayment || 'NOT PAID',
+				scanType: g.statusOut === 'OUT' ? 'OUT' : 'IN'
 			}));
 		} catch (err) {
 			console.error('Failed to load historical scans:', err);
@@ -194,10 +196,11 @@
 			const data = await res.json();
 
 			if (data.success) {
+				const isOut = data.scanType === 'OUT';
 				scannerStatus = 'success';
-				statusText = 'Attendance recorded!';
+				statusText = isOut ? 'Afternoon recorded!' : 'Attendance recorded!';
 				resultTitle = data.name || 'Attendance Recorded';
-				resultMessage = 'Successfully checked in';
+				resultMessage = isOut ? 'Afternoon check-in successful' : 'Successfully checked in';
 
 				scanLog = [
 					{
@@ -205,7 +208,8 @@
 						status: 'success',
 						message: '',
 						time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-						proofOfPayment: data.proofOfPayment || 'NOT PAID'
+						proofOfPayment: data.proofOfPayment || 'NOT PAID',
+						scanType: data.scanType || 'IN'
 					},
 					...scanLog
 				];
@@ -230,21 +234,25 @@
 						},
 						...scanLog
 					];
-				} else if (msg.includes('already') || msg.includes('duplicate')) {
-					// Extract name from message like "Already checked in: John Doe"
+				} else if (
+					msg.includes('already') ||
+					msg.includes('duplicate') ||
+					msg.includes('fully checked')
+				) {
+					// Extract name from message like "Already fully checked in: John Doe"
 					const nameFromMsg = data.name || data.message?.split(': ').slice(1).join(': ') || '';
 					scannerStatus = 'duplicate';
-					statusText = 'Already Attended!';
+					statusText = 'Already Checked In!';
 					resultTitle = 'Already Checked In';
 					resultMessage = nameFromMsg
-						? `${nameFromMsg} has already attended`
+						? `${nameFromMsg} has already fully checked in`
 						: 'This guest has already been scanned';
 
 					scanLog = [
 						{
-							name: nameFromMsg || 'Already Attended',
+							name: nameFromMsg || 'Already Checked In',
 							status: 'duplicate',
-							message: 'Already attended',
+							message: 'Already checked in',
 							time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
 							proofOfPayment: data.proofOfPayment || 'NOT PAID'
 						},
@@ -534,7 +542,11 @@
 								</div>
 								<div class="log-time" class:duplicate-time={entry.status === 'duplicate'}>
 									{#if entry.status === 'duplicate'}
-										Already attended
+										Already checked in
+									{:else if entry.scanType === 'OUT'}
+										{entry.time} ·  OUT
+									{:else if entry.scanType === 'IN'}
+										{entry.time} · IN
 									{:else}
 										{entry.time}
 									{/if}
