@@ -8,6 +8,7 @@
 		type: string;
 		certId: string;
 		scanTime: string | null;
+		signoutTime: string | null;
 		attended: boolean;
 		proofOfPayment: string;
 		statusOut: string;
@@ -36,6 +37,14 @@
 	let guestForPayment = $state<Guest | null>(null);
 	let approvingCertId = $state<string | null>(null);
 	let revokingCertId = $state<string | null>(null);
+	let sendingProgramCertId = $state<string | null>(null);
+	let showSuccessToast = $state(false);
+	let successToastMessage = $state('');
+	let sendingAll = $state(false);
+	let sendAllProgress = $state({ sent: 0, total: 0 });
+	let sendStatusList = $state<
+		Array<{ name: string; status: 'pending' | 'sending' | 'success' | 'failed' }>
+	>([]);
 
 	// Mark as Paid modal (for Not Paid → open modal → Mark as Paid)
 	let showMarkPaidModal = $state(false);
@@ -49,6 +58,14 @@
 	function closeMarkPaidModal() {
 		showMarkPaidModal = false;
 		guestForMarkPaid = null;
+	}
+
+	function showSuccessNotification(message: string) {
+		successToastMessage = message;
+		showSuccessToast = true;
+		setTimeout(() => {
+			showSuccessToast = false;
+		}, 3000);
 	}
 
 	// Generic confirmation dialog
@@ -170,6 +187,103 @@
 		} finally {
 			revokingCertId = null;
 		}
+	}
+
+	async function sendProgram(guest: Guest, event?: Event) {
+		if (event) {
+			event.stopPropagation();
+		}
+		if (!guest.certId) return;
+
+		sendingProgramCertId = guest.certId;
+		try {
+			const res = await fetch('/api/send-program', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ certId: guest.certId })
+			});
+			const data = await res.json();
+			if (data.success) {
+				showSuccessNotification(`Program sent to ${guest.name}`);
+			} else {
+				alert(data.message || 'Failed to send program');
+			}
+		} catch (e) {
+			console.error('Failed to send program', e);
+			alert('Failed to send program');
+		} finally {
+			sendingProgramCertId = null;
+		}
+	}
+
+	async function sendAllPrograms() {
+		const attendedGuestsWithEmail = filteredGuests.filter((g) => g.attended && g.email && g.certId);
+
+		if (attendedGuestsWithEmail.length === 0) {
+			alert('No attended guests with email addresses found');
+			return;
+		}
+
+		const confirmed = confirm(
+			`Send program to ${attendedGuestsWithEmail.length} attended guest(s)?\n\nThis will send in batches of 3 emails every 10 seconds to avoid rate limits.`
+		);
+		if (!confirmed) return;
+
+		sendingAll = true;
+		sendAllProgress = { sent: 0, total: attendedGuestsWithEmail.length };
+		sendStatusList = attendedGuestsWithEmail.map((g) => ({ name: g.name, status: 'pending' }));
+
+		let successCount = 0;
+		let failCount = 0;
+		const BATCH_SIZE = 3;
+		const BATCH_DELAY = 10000;
+
+		for (let i = 0; i < attendedGuestsWithEmail.length; i += BATCH_SIZE) {
+			const batch = attendedGuestsWithEmail.slice(i, i + BATCH_SIZE);
+
+			const batchPromises = batch.map(async (guest, batchIndex) => {
+				const statusIndex = i + batchIndex;
+				sendStatusList[statusIndex].status = 'sending';
+
+				try {
+					const res = await fetch('/api/send-program', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ certId: guest.certId })
+					});
+					const data = await res.json();
+
+					if (data.success) {
+						sendStatusList[statusIndex].status = 'success';
+						successCount++;
+					} else {
+						sendStatusList[statusIndex].status = 'failed';
+						failCount++;
+					}
+				} catch (e) {
+					console.error('Failed to send program to', guest.name, e);
+					sendStatusList[statusIndex].status = 'failed';
+					failCount++;
+				}
+
+				sendAllProgress.sent++;
+			});
+
+			await Promise.all(batchPromises);
+
+			if (i + BATCH_SIZE < attendedGuestsWithEmail.length) {
+				await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
+			}
+		}
+
+		sendingAll = false;
+		showSuccessNotification(
+			`Program sent to ${successCount} guest(s)${failCount > 0 ? `, ${failCount} failed` : ''}`
+		);
+
+		setTimeout(() => {
+			sendStatusList = [];
+		}, 5000);
 	}
 
 	let attendedCount = $derived(guests.filter((g) => g.attended).length);
@@ -390,7 +504,32 @@
 					<span class="count-badge">{attendedCount}/{totalCount}</span>
 				</div>
 				<div class="header-right">
-					<!-- Removed refresh button, moved inline with filters -->
+					<button
+						class="send-all-btn"
+						disabled={sendingAll}
+						onclick={sendAllPrograms}
+						aria-label="Send Program to All Attended Guests"
+					>
+						{#if sendingAll}
+							<span class="btn-spinner"></span>
+							Sending {sendAllProgress.sent}/{sendAllProgress.total}
+						{:else}
+							<svg
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M22 2L11 13" />
+								<path d="M22 2L15 22L11 13L2 9L22 2Z" />
+							</svg>
+							Send All Program
+						{/if}
+					</button>
 				</div>
 			</div>
 
@@ -540,12 +679,12 @@
 									<th class="col-payment">Payment</th>
 									<th class="col-time">Time</th>
 									<th class="col-status">Status</th>
+									<th class="col-signout">Signed Out</th>
+									<th class="col-actions">Actions</th>
 								</tr>
 							</thead>
 							<tbody>
 								{#each pagedGuests as guest, i}
-									<!-- svelte-ignore a11y_click_events_have_key_events -->
-									<!-- svelte-ignore a11y_no_static_element_interactions -->
 									<tr
 										class="row-clickable"
 										onclick={() =>
@@ -583,6 +722,42 @@
 											{:else}
 												<span class="status-badge not-attended">Not Yet</span>
 											{/if}
+										</td>
+										<td class="col-signout">
+											{#if guest.signoutTime}
+												<span class="signout-badge signed-out">Yes</span>
+											{:else if guest.attended}
+												<span class="signout-badge not-signed-out">No</span>
+											{:else}
+												<span class="signout-badge na">-</span>
+											{/if}
+										</td>
+										<td class="col-actions">
+											<button
+												class="send-program-btn"
+												disabled={sendingProgramCertId === guest.certId}
+												onclick={(e) => sendProgram(guest, e)}
+												aria-label="Send Program"
+											>
+												{#if sendingProgramCertId === guest.certId}
+													<span class="btn-spinner"></span>
+												{:else}
+													<svg
+														width="14"
+														height="14"
+														viewBox="0 0 24 24"
+														fill="none"
+														stroke="currentColor"
+														stroke-width="2"
+														stroke-linecap="round"
+														stroke-linejoin="round"
+													>
+														<path d="M22 2L11 13" />
+														<path d="M22 2L15 22L11 13L2 9L22 2Z" />
+													</svg>
+													Send Program
+												{/if}
+											</button>
 										</td>
 									</tr>
 								{/each}
@@ -806,6 +981,94 @@
 	</div>
 {/if}
 
+{#if showSuccessToast}
+	<div class="success-toast">
+		<svg
+			width="20"
+			height="20"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2.5"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
+			<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+			<polyline points="22 4 12 14.01 9 11.01" />
+		</svg>
+		<span>{successToastMessage}</span>
+	</div>
+{/if}
+
+{#if sendingAll && sendStatusList.length > 0}
+	<div class="modal-backdrop">
+		<div class="modal-content send-status-modal">
+			<div class="modal-header">
+				<h3>Sending Program</h3>
+				<div class="send-progress-text">{sendAllProgress.sent} / {sendAllProgress.total}</div>
+			</div>
+			<div class="modal-body send-status-body">
+				<div class="send-status-list">
+					{#each sendStatusList as item}
+						<div
+							class="send-status-item"
+							class:pending={item.status === 'pending'}
+							class:sending={item.status === 'sending'}
+							class:success={item.status === 'success'}
+							class:failed={item.status === 'failed'}
+						>
+							<span class="status-name">{item.name}</span>
+							<span class="status-indicator">
+								{#if item.status === 'pending'}
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<circle cx="12" cy="12" r="10" />
+									</svg>
+								{:else if item.status === 'sending'}
+									<span class="status-spinner"></span>
+								{:else if item.status === 'success'}
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.5"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<polyline points="20 6 9 17 4 12" />
+									</svg>
+								{:else if item.status === 'failed'}
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.5"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<line x1="18" y1="6" x2="6" y2="18" />
+										<line x1="6" y1="6" x2="18" y2="18" />
+									</svg>
+								{/if}
+							</span>
+						</div>
+					{/each}
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
 <style>
 	.page-layout {
 		display: flex;
@@ -875,6 +1138,40 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
+	}
+
+	.send-all-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 10px 18px;
+		font-size: 14px;
+		font-weight: 600;
+		color: #fff;
+		background: var(--bg-sidebar);
+		border: none;
+		border-radius: 10px;
+		cursor: pointer;
+		font-family: inherit;
+		transition:
+			opacity 0.2s,
+			transform 0.1s;
+		white-space: nowrap;
+		box-shadow: var(--shadow-sm);
+	}
+
+	.send-all-btn:hover:not(:disabled) {
+		opacity: 0.9;
+	}
+
+	.send-all-btn:active:not(:disabled) {
+		transform: scale(0.98);
+	}
+
+	.send-all-btn:disabled {
+		opacity: 0.7;
+		cursor: not-allowed;
 	}
 
 	.filter-select {
@@ -1294,10 +1591,45 @@
 		text-align: center;
 	}
 
+	.col-actions {
+		text-align: center;
+		width: 140px;
+	}
+
+	.col-signout {
+		text-align: center;
+		width: 100px;
+	}
+
 	.guest-table th.col-time,
 	.guest-table th.col-status,
-	.guest-table th.col-payment {
+	.guest-table th.col-payment,
+	.guest-table th.col-signout,
+	.guest-table th.col-actions {
 		text-align: center;
+	}
+
+	.signout-badge {
+		display: inline-block;
+		padding: 6px 12px;
+		border-radius: 8px;
+		font-size: 12px;
+		font-weight: 600;
+	}
+
+	.signout-badge.signed-out {
+		background: rgba(34, 197, 94, 0.1);
+		color: #16a34a;
+	}
+
+	.signout-badge.not-signed-out {
+		background: rgba(239, 68, 68, 0.08);
+		color: #dc2626;
+	}
+
+	.signout-badge.na {
+		background: #f3f4f6;
+		color: #9ca3af;
 	}
 
 	.payment-badge {
@@ -1316,6 +1648,39 @@
 	.payment-badge.not-paid {
 		background: rgba(239, 68, 68, 0.08);
 		color: #dc2626;
+	}
+
+	.send-program-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		padding: 8px 12px;
+		font-size: 12px;
+		font-weight: 600;
+		color: #fff;
+		background: var(--bg-sidebar);
+		border: none;
+		border-radius: 8px;
+		cursor: pointer;
+		font-family: inherit;
+		transition:
+			opacity 0.2s,
+			transform 0.1s;
+		white-space: nowrap;
+	}
+
+	.send-program-btn:hover:not(:disabled) {
+		opacity: 0.9;
+	}
+
+	.send-program-btn:active:not(:disabled) {
+		transform: scale(0.97);
+	}
+
+	.send-program-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
 	}
 
 	/* Mark as Paid modal */
@@ -1523,6 +1888,10 @@
 			padding: 0;
 			text-align: center;
 			align-self: center;
+		}
+
+		.guest-table td.col-actions {
+			display: none;
 		}
 
 		.status-badge,
@@ -2023,6 +2392,134 @@
 	.confirm-dialog-confirm:disabled {
 		opacity: 0.65;
 		cursor: not-allowed;
+	}
+
+	.success-toast {
+		position: fixed;
+		top: 20px;
+		right: 20px;
+		background: #16a34a;
+		color: #ffffff;
+		padding: 14px 20px;
+		border-radius: 12px;
+		box-shadow: 0 8px 24px rgba(22, 163, 74, 0.3);
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		z-index: 2000;
+		font-size: 14px;
+		font-weight: 600;
+		animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	}
+
+	.success-toast svg {
+		flex-shrink: 0;
+	}
+
+	.send-status-modal {
+		max-width: 500px;
+		max-height: 80vh;
+	}
+
+	.send-progress-text {
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--bg-sidebar);
+		background: rgba(128, 0, 0, 0.1);
+		padding: 6px 12px;
+		border-radius: 8px;
+	}
+
+	.send-status-body {
+		padding: 0;
+		overflow-y: auto;
+		max-height: calc(80vh - 80px);
+	}
+
+	.send-status-list {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.send-status-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 12px 20px;
+		border-bottom: 1px solid var(--border-color);
+		transition: background 0.2s;
+	}
+
+	.send-status-item:last-child {
+		border-bottom: none;
+	}
+
+	.status-name {
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--text-primary);
+		flex: 1;
+	}
+
+	.status-indicator {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 24px;
+		height: 24px;
+		flex-shrink: 0;
+	}
+
+	.send-status-item.pending {
+		background: #fafafa;
+	}
+
+	.send-status-item.pending .status-indicator {
+		color: #9ca3af;
+	}
+
+	.send-status-item.sending {
+		background: rgba(59, 130, 246, 0.05);
+	}
+
+	.send-status-item.sending .status-indicator {
+		color: #3b82f6;
+	}
+
+	.send-status-item.success {
+		background: rgba(34, 197, 94, 0.05);
+	}
+
+	.send-status-item.success .status-indicator {
+		color: #16a34a;
+	}
+
+	.send-status-item.failed {
+		background: rgba(239, 68, 68, 0.05);
+	}
+
+	.send-status-item.failed .status-indicator {
+		color: #dc2626;
+	}
+
+	.status-spinner {
+		width: 16px;
+		height: 16px;
+		border: 2px solid rgba(59, 130, 246, 0.2);
+		border-top-color: #3b82f6;
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+
+	@keyframes slideInRight {
+		from {
+			opacity: 0;
+			transform: translateX(100px);
+		}
+		to {
+			opacity: 1;
+			transform: translateX(0);
+		}
 	}
 
 	@keyframes fadeIn {
